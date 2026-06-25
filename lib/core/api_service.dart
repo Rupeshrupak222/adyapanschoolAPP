@@ -355,6 +355,114 @@ class ApiService {
     return res != null;
   }
 
+  // ─── MESSAGING (Admin ↔ Principal ↔ Teacher ↔ Student) ───────────
+
+  /// Fetch messages for the currently logged-in user
+  Future<List<Map<String, dynamic>>> fetchMessages() async {
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/v1/messages'),
+        headers: _headers,
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 401) {
+        final refreshed = await _refreshAccessToken();
+        if (refreshed) return fetchMessages();
+        return [];
+      }
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data is Map && data['messages'] != null) {
+          return List<Map<String, dynamic>>.from(data['messages']);
+        }
+        if (data is List) {
+          return List<Map<String, dynamic>>.from(data);
+        }
+      }
+    } catch (e) {
+      print('❌ fetchMessages error: $e');
+    }
+    return [];
+  }
+
+  /// Fetch messages for a specific student (by email)
+  Future<List<Map<String, dynamic>>> fetchStudentMessages(String email) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/v1/messages/student?email=${Uri.encodeComponent(email)}'),
+        headers: _headers,
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 401) {
+        final refreshed = await _refreshAccessToken();
+        if (refreshed) return fetchStudentMessages(email);
+        return [];
+      }
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data is Map && data['messages'] != null) {
+          return List<Map<String, dynamic>>.from(data['messages']);
+        }
+        if (data is List) {
+          return List<Map<String, dynamic>>.from(data);
+        }
+      }
+    } catch (e) {
+      print('❌ fetchStudentMessages error: $e');
+    }
+    return [];
+  }
+
+  /// Send a message (teacher → admin/principal/student, principal → admin/teacher)
+  Future<bool> sendMessage({
+    required String recipientEmail,
+    required String recipientRole,
+    required String message,
+    String? senderName,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/v1/messages'),
+        headers: _headers,
+        body: jsonEncode({
+          'recipient_email': recipientEmail,
+          'recipient_role': recipientRole,
+          'message': message,
+          'sender_name': senderName,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 401) {
+        final refreshed = await _refreshAccessToken();
+        if (refreshed) {
+          return sendMessage(
+            recipientEmail: recipientEmail,
+            recipientRole: recipientRole,
+            message: message,
+            senderName: senderName,
+          );
+        }
+        return false;
+      }
+
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (e) {
+      print('❌ sendMessage error: $e');
+      return false;
+    }
+  }
+
+  /// Mark a message as read
+  Future<void> markMessageRead(String messageId) async {
+    try {
+      await _put('/api/v1/messages/$messageId/read', {});
+    } catch (e) {
+      print('❌ markMessageRead error: $e');
+    }
+  }
+
   // ─── PRIVATE HELPERS ──────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> _get(String path) async {

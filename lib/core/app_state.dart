@@ -3078,6 +3078,30 @@ class AppState extends ChangeNotifier {
     print('🛑 Periodic database sync timer stopped.');
   }
 
+  /// Called when app resumes from background — re-verify session and sync data
+  Future<void> refreshDataOnResume() async {
+    if (!_isLoggedIn) return;
+    try {
+      // Verify token is still valid
+      final api = ApiService();
+      final result = await api.getMe();
+      if (result != null && result['success'] == true) {
+        _sessionVerified = true;
+        // Trigger a full data sync
+        await syncAllData();
+      } else {
+        // Token expired — force logout
+        _isLoggedIn = false;
+        _sessionVerified = false;
+        _prefs.setBool('is_logged_in', false);
+        await api.clearTokens();
+        notifyListeners();
+      }
+    } catch (e) {
+      print('⚠️ refreshDataOnResume error: $e');
+    }
+  }
+
   Future<void> syncAllData() async {
     if (_isSyncing || !_isLoggedIn) return;
     _isSyncing = true;

@@ -11,6 +11,7 @@ import '../core/theme.dart';
 import '../core/app_state.dart';
 import '../core/db_helper.dart';
 import 'login_screen.dart';
+import 'messages_screen.dart';
 import 'teacher_future_skills_planner_screen.dart';
 import 'profile_screen.dart';
 
@@ -36,7 +37,7 @@ class TeacherDashboardScreen extends StatefulWidget {
   State<TeacherDashboardScreen> createState() => _TeacherDashboardScreenState();
 }
 
-class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
+class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _activeTab = 0;
   int _selectedRoadmapSubject = 0;
@@ -78,6 +79,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<AppState>(context, listen: false).fetchLinkedStudents();
     });
@@ -85,8 +87,20 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _communicationMsgCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Re-fetch data when app comes back to foreground
+      final appState = Provider.of<AppState>(context, listen: false);
+      if (appState.isLoggedIn && appState.sessionVerified) {
+        appState.refreshDataOnResume();
+      }
+    }
   }
 
   void _copyUid(String uid) {
@@ -374,6 +388,17 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                         onTap: () {
                           Navigator.pop(context);
                           setState(() => _activeTab = 5);
+                        },
+                      ),
+                      _buildDrawerItem(
+                        icon: Icons.message_outlined,
+                        title: state.translate('Messages'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const MessagesScreen()),
+                          );
                         },
                       ),
                     ],

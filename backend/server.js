@@ -39,6 +39,10 @@ const paymentRoutes = require('./routes/payments');
 const noticeRoutes = require('./routes/notices');
 const dashboardRoutes = require('./routes/dashboard');
 const bulkImportRoutes = require('./routes/bulk-import');
+const appHomeworkRoutes = require('./routes/app-homework');
+const appDoubtsRoutes = require('./routes/app-doubts');
+const appLiveClassesRoutes = require('./routes/app-live-classes');
+const messagesRoutes = require('./routes/messages');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -233,6 +237,10 @@ app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/notices', noticeRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/bulk-import', bulkImportRoutes);
+app.use('/api/v1/app-homework', appHomeworkRoutes);
+app.use('/api/v1/app-doubts', appDoubtsRoutes);
+app.use('/api/v1/app-live-classes', appLiveClassesRoutes);
+app.use('/api/v1/messages', messagesRoutes);
 
 // ─── File Upload Endpoint (AWS S3 or local fallback) ─────────────────
 app.post('/api/v1/upload', upload.single('file'), async (req, res) => {
