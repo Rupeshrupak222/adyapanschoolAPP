@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/theme.dart';
 import '../core/app_state.dart';
+import '../core/api_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -191,10 +192,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _handleSaveProfile() {
+  void _handleSaveProfile() async {
     if (_formKey.currentState!.validate()) {
       final state = Provider.of<AppState>(context, listen: false);
       
+      // Upload avatar to server if changed
+      if (_profileImagePath.isNotEmpty && !_profileImagePath.startsWith('http')) {
+        final api = ApiService();
+        final url = await api.uploadFile(_profileImagePath);
+        if (url != null) {
+          await api.updateAvatar(url);
+          // Save server URL as the image path
+          _profileImagePath = '${api.baseUrl}$url';
+        }
+      }
+
       // Save details to state
       state.updateProfile(
         name: _nameController.text.trim(),
@@ -205,6 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         imagePath: _profileImagePath,
       );
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(

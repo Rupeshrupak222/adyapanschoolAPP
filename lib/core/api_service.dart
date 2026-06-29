@@ -606,6 +606,45 @@ class ApiService {
     await clearTokens();
     return false;
   }
+
+  /// Upload a file (avatar image) to the server
+  /// Returns the file URL on success, null on failure
+  Future<String?> uploadFile(String filePath) async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/v1/upload');
+      final request = http.MultipartRequest('POST', uri);
+      request.headers.addAll(_headers);
+      request.files.add(await http.MultipartFile.fromPath('file', filePath));
+      
+      final streamedRes = await request.send().timeout(const Duration(seconds: 60));
+      final res = await http.Response.fromStream(streamedRes);
+      
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        final data = jsonDecode(res.body);
+        if (data['file'] != null && data['file']['url'] != null) {
+          return data['file']['url'] as String;
+        }
+      }
+    } catch (e) {
+      print('❌ Upload file error: $e');
+    }
+    return null;
+  }
+
+  /// Update student avatar URL on the server
+  Future<bool> updateAvatar(String avatarUrl) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/v1/profile/avatar'),
+        headers: _headers,
+        body: jsonEncode({'avatarUrl': avatarUrl}),
+      ).timeout(const Duration(seconds: 10));
+      return res.statusCode == 200;
+    } catch (e) {
+      print('❌ Update avatar error: $e');
+      return false;
+    }
+  }
 }
 
 /// Custom exception for authentication errors with user-friendly messages
