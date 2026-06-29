@@ -427,9 +427,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     ),
                                     child: ClipOval(
                                       child: state.profileImagePath.isNotEmpty
-                                          ? (state.profileImagePath.startsWith('http') || state.profileImagePath.startsWith('data:')
-                                              ? Image.network(
-                                                  state.profileImagePath,
+                                          ? (state.profileImagePath.startsWith('data:')
+                                              ? Image.memory(
+                                                  Uri.parse(state.profileImagePath).data!.contentAsBytes(),
                                                   fit: BoxFit.cover,
                                                   width: 46,
                                                   height: 46,
@@ -440,12 +440,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                                     child: Text(state.studentName.isNotEmpty ? state.studentName[0].toUpperCase() : 'S', style: GoogleFonts.fredoka(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                                                   ),
                                                 )
-                                              : Image.file(
-                                                  File(state.profileImagePath),
-                                                  fit: BoxFit.cover,
-                                                  width: 46,
-                                                  height: 46,
-                                                ))
+                                              : state.profileImagePath.startsWith('http')
+                                                  ? Image.network(
+                                                      state.profileImagePath,
+                                                      fit: BoxFit.cover,
+                                                      width: 46,
+                                                      height: 46,
+                                                      errorBuilder: (_, __, ___) => Container(
+                                                        width: 46, height: 46,
+                                                        alignment: Alignment.center,
+                                                        color: const Color(0xFFFBBF24),
+                                                        child: Text(state.studentName.isNotEmpty ? state.studentName[0].toUpperCase() : 'S', style: GoogleFonts.fredoka(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                                                      ),
+                                                    )
+                                                  : Image.file(
+                                                      File(state.profileImagePath),
+                                                      fit: BoxFit.cover,
+                                                      width: 46,
+                                                      height: 46,
+                                                    ))
                                           : Container(
                                               decoration: const BoxDecoration(
                                                 gradient: LinearGradient(
