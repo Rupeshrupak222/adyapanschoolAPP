@@ -343,12 +343,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         child: ClipOval(
                           child: _profileImagePath.isNotEmpty
-                              ? Image.file(
-                                  File(_profileImagePath),
-                                  fit: BoxFit.cover,
-                                  width: 102,
-                                  height: 102,
-                                )
+                              ? (_profileImagePath.startsWith('http') || _profileImagePath.startsWith('data:')
+                                  ? Image.network(
+                                      _profileImagePath,
+                                      fit: BoxFit.cover,
+                                      width: 102,
+                                      height: 102,
+                                      errorBuilder: (_, __, ___) => Container(
+                                        width: 102, height: 102,
+                                        alignment: Alignment.center,
+                                        decoration: const BoxDecoration(
+                                          gradient: LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFEA580C)]),
+                                        ),
+                                        child: Text(initials, style: GoogleFonts.fredoka(fontSize: 38, fontWeight: FontWeight.bold, color: Colors.white)),
+                                      ),
+                                    )
+                                  : Image.file(
+                                      File(_profileImagePath),
+                                      fit: BoxFit.cover,
+                                      width: 102,
+                                      height: 102,
+                                    ))
                               : Container(
                                   decoration: const BoxDecoration(
                                     gradient: LinearGradient(

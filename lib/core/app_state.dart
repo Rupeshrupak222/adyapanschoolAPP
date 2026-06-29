@@ -1543,7 +1543,7 @@ class AppState extends ChangeNotifier {
     try {
       final conn = await DbHelper.getConnection();
       final results = await conn.execute(
-        'SELECT name, phone, class_name, class_level, school, school_name, xp, level, streak, completed_quizzes FROM users WHERE LOWER(email) = :email;',
+        'SELECT name, phone, class_name, class_level, school, school_name, xp, level, streak, completed_quizzes, avatar_url FROM users WHERE LOWER(email) = :email;',
         {'email': email.toLowerCase().trim()},
       );
       if (results.rows.isNotEmpty) {
@@ -1552,6 +1552,14 @@ class AppState extends ChangeNotifier {
         _studentPhone = row['phone'] ?? _studentPhone;
         _studentClass = row['class_name'] ?? row['class_level'] ?? _studentClass;
         _studentSchool = row['school'] ?? row['school_name'] ?? _studentSchool;
+
+        // Sync avatar from web — if avatar_url exists in DB and starts with http or data:, use it
+        final dbAvatar = row['avatar_url'] ?? '';
+        if (dbAvatar.isNotEmpty && (dbAvatar.startsWith('http') || dbAvatar.startsWith('data:') || dbAvatar.startsWith('/uploads'))) {
+          final baseUrl = 'https://preschool-wzjj.onrender.com';
+          _profileImagePath = dbAvatar.startsWith('/uploads') ? '$baseUrl$dbAvatar' : dbAvatar;
+          _prefs.setString('profile_image_path', _profileImagePath);
+        }
 
         _xp = row['xp'] != null ? int.tryParse(row['xp'].toString()) ?? _xp : _xp;
         _level = row['level'] != null ? int.tryParse(row['level'].toString()) ?? _level : _level;
