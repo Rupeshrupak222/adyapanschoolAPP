@@ -96,30 +96,38 @@ class _NotesLibraryScreenState extends State<NotesLibraryScreen> {
   }
 
   Future<void> _openNoteFile(BuildContext context, String fileUrl, String title) async {
-    if (fileUrl.startsWith('http')) {
-      final uri = Uri.tryParse(fileUrl);
+    // Prepend backend base URL if it's a relative path
+    const baseUrl = 'https://preschool-wzjj.onrender.com';
+    String url = fileUrl;
+    if (url.startsWith('/uploads')) {
+      url = '$baseUrl$url';
+    }
+    
+    if (url.startsWith('http')) {
+      final uri = Uri.tryParse(url);
       if (uri != null && await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
         return;
       }
-    } else {
-      final file = File(fileUrl);
+    } else if (url.isNotEmpty) {
+      final file = File(url);
       if (file.existsSync()) {
-        final uri = Uri.file(fileUrl);
+        final uri = Uri.file(url);
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
           return;
         }
       }
     }
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Could not open file URL: $fileUrl')),
+      SnackBar(content: Text('Could not open file. URL: $fileUrl')),
     );
   }
 
   void _showNoteReader(Map<String, dynamic> note) {
     final state = Provider.of<AppState>(context, listen: false);
-    final fileUrl = note['filePath'] as String? ?? '';
+    final fileUrl = note['fileUrl'] as String? ?? note['filePath'] as String? ?? '';
     final fileName = note['fileName'] as String? ?? '';
     final isImage = fileUrl.toLowerCase().endsWith('.png') ||
                     fileUrl.toLowerCase().endsWith('.jpg') ||
@@ -410,7 +418,7 @@ class _NotesLibraryScreenState extends State<NotesLibraryScreen> {
                           child: ElevatedButton.icon(
                             onPressed: () {
                               if (isDone) {
-                                final fileUrl = note['filePath'] as String? ?? '';
+                                final fileUrl = note['fileUrl'] as String? ?? note['filePath'] as String? ?? '';
                                 if (fileUrl.isNotEmpty) {
                                   _openNoteFile(context, fileUrl, note['title'] ?? 'Document');
                                 } else {
