@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:mysql_client/mysql_client.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dbcrypt/dbcrypt.dart';
 import 'package:argon2/argon2.dart';
 
@@ -1047,6 +1048,29 @@ class DbHelper {
         'filePath': filePath ?? '',
         'studentComment': studentComment ?? '',
       });
+
+      // Also insert into homework_submissions table (used by web teacher dashboard)
+      try {
+        final webSubId = _newId('websub');
+        await conn.execute('''
+          DELETE FROM homework_submissions WHERE homework_id = :hwId AND student_email = :email;
+        ''', {'hwId': homeworkId.toString(), 'email': studentEmail});
+        await conn.execute('''
+          INSERT INTO homework_submissions (id, homework_id, student_email, student_name, file_name, file_url, comment, status)
+          VALUES (:id, :homeworkId, :studentEmail, :studentName, :fileName, :fileUrl, :comment, 'submitted');
+        ''', {
+          'id': webSubId,
+          'homeworkId': homeworkId.toString(),
+          'studentEmail': studentEmail,
+          'studentName': studentName,
+          'fileName': fileName ?? '',
+          'fileUrl': filePath ?? '',
+          'comment': studentComment ?? '',
+        });
+      } catch (e) {
+        print('⚠️ Web homework_submissions sync failed (non-critical): $e');
+      }
+
       return true;
     } catch (e) {
       print('❌ Failed to submit homework: $e');
@@ -1629,6 +1653,13 @@ class DbHelper {
     final baseUrl = dotenv.env['API_BASE_URL'] ?? '';
     final localUrl = dotenv.env['LOCAL_API_BASE_URL'] ?? 'http://10.0.2.2:4000';
     
+    // Get auth token from ApiService
+    String? authToken;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      authToken = prefs.getString('auth_token');
+    } catch (_) {}
+
     final baseCandidates = [
       if (baseUrl.isNotEmpty) baseUrl,
       localUrl,
@@ -1643,19 +1674,25 @@ class DbHelper {
         print('📡 Sending file upload request to: $uri');
         final request = http.MultipartRequest('POST', uri)
           ..files.add(await http.MultipartFile.fromPath('file', file.path));
+        // Add auth token
+        if (authToken != null && authToken.isNotEmpty) {
+          request.headers['Authorization'] = 'Bearer $authToken';
+        }
+        request.headers['User-Agent'] = 'Dart/Flutter (Adyapan School App)';
         
-        final response = await request.send().timeout(const Duration(seconds: 20));
+        final response = await request.send().timeout(const Duration(seconds: 30));
         if (response.statusCode == 200 || response.statusCode == 201) {
           final resBody = await response.stream.bytesToString();
           final data = jsonDecode(resBody);
           if (data['success'] == true && data['url'] != null) {
             final fileUrl = data['url'] as String;
-            print('📁 File uploaded successfully to backend: $fileUrl');
-            // If the URL contains localhost/127.0.0.1 and we are running on emulator, we might want to replace it
-            // with the base url that succeeded so the emulator can fetch it. But the server constructs it from request host header,
-            // which will already be correct (e.g. 10.0.2.2:4000 if request went to 10.0.2.2).
-            return fileUrl;
+            final fullUrl = fileUrl.startsWith('http') ? fileUrl : '$cleanBase$fileUrl';
+            print('📁 File uploaded successfully: $fullUrl');
+            return fullUrl;
           }
+        } else {
+          final resBody = await response.stream.bytesToString();
+          print('⚠️ Upload returned ${response.statusCode}: $resBody');
         }
       } catch (e) {
         print('⚠️ Failed to upload file to $base: $e');
