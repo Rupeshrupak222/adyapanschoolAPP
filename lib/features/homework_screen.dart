@@ -5,10 +5,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:confetti/confetti.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 import '../core/theme.dart';
 import '../core/app_state.dart';
 
 /// Opens a file URL (web, local, or cloud) using the OS viewer.
+/// If it's a network file, downloads it to device storage first.
 Future<void> _openAttachment(BuildContext context, String? fileUrl, String? filePath, {String? defaultFileName}) async {
   final name = defaultFileName ?? (filePath != null ? filePath.split(Platform.isWindows ? '\\' : '/').last : 'Attachment');
 
@@ -25,14 +27,69 @@ Future<void> _openAttachment(BuildContext context, String? fileUrl, String? file
   }
 
   if (netUrl != null) {
+    // Try to download the file to device storage
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⬇️ Downloading $name...', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          backgroundColor: const Color(0xFF2563EB),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      final response = await http.get(Uri.parse(netUrl)).timeout(const Duration(seconds: 30));
+      
+      if (response.statusCode == 200) {
+        // Save to device Downloads directory
+        final dir = Directory('/storage/emulated/0/Download');
+        final downloadsDir = dir.existsSync() ? dir : Directory('/storage/emulated/0/Documents');
+        
+        if (!downloadsDir.existsSync()) {
+          downloadsDir.createSync(recursive: true);
+        }
+        
+        final safeName = name.replaceAll(RegExp(r'[^\w\s\-\.]'), '_');
+        final savePath = '${downloadsDir.path}/$safeName';
+        final file = File(savePath);
+        await file.writeAsBytes(response.bodyBytes);
+        
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Downloaded to: ${file.path}', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Open',
+              textColor: Colors.white,
+              onPressed: () async {
+                final uri = Uri.file(file.path);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ),
+        );
+        return;
+      }
+    } catch (e) {
+      debugPrint('Download failed: $e');
+    }
+
+    // Fallback: open in browser
     final uri = Uri.tryParse(netUrl);
     if (uri != null && await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
       return;
     }
   }
+
   // Fallback: try local file path
-  if (filePath != null && filePath.isNotEmpty && !filePath.startsWith('http')) {
+  if (filePath != null && filePath.isNotEmpty && !filePath.startsWith('http') && !filePath.startsWith('/uploads')) {
     final file = File(filePath);
     if (file.existsSync()) {
       final uri = Uri.file(filePath);
@@ -43,8 +100,10 @@ Future<void> _openAttachment(BuildContext context, String? fileUrl, String? file
     }
   }
 
-  // Open beautiful In-App Viewer as robust fallback!
-  _showInAppAttachmentViewer(context, name, filePath, fileUrl);
+  // Open In-App Viewer as fallback
+  if (context.mounted) {
+    _showInAppAttachmentViewer(context, name, filePath, netUrl ?? fileUrl);
+  }
 }
 
 void _showInAppAttachmentViewer(BuildContext context, String fileName, String? filePath, String? fileUrl) {
