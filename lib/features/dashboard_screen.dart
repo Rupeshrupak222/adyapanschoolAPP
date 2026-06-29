@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -429,7 +431,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       child: state.profileImagePath.isNotEmpty
                                           ? (state.profileImagePath.startsWith('data:')
                                               ? Image.memory(
-                                                  Uri.parse(state.profileImagePath).data!.contentAsBytes(),
+                                                  base64Decode(state.profileImagePath.split(',').last),
                                                   fit: BoxFit.cover,
                                                   width: 46,
                                                   height: 46,
@@ -458,6 +460,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                                       fit: BoxFit.cover,
                                                       width: 46,
                                                       height: 46,
+                                                      errorBuilder: (_, __, ___) => Container(
+                                                        width: 46, height: 46,
+                                                        alignment: Alignment.center,
+                                                        color: const Color(0xFFFBBF24),
+                                                        child: Text(state.studentName.isNotEmpty ? state.studentName[0].toUpperCase() : 'S', style: GoogleFonts.fredoka(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                                                      ),
                                                     ))
                                           : Container(
                                               decoration: const BoxDecoration(

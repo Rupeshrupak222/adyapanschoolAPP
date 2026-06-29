@@ -308,6 +308,8 @@ class AppState extends ChangeNotifier {
     _studentClass = _prefs.getString('student_class') ?? '';
     _studentSchool = _prefs.getString('student_school') ?? '';
     _profileImagePath = _prefs.getString('profile_image_path') ?? '';
+    // If marker, clear it — will be fetched fresh from DB during sync
+    if (_profileImagePath == 'HAS_DB_AVATAR') _profileImagePath = '';
     _completedQuizzesCount = _prefs.getInt('completed_quizzes_count') ?? 4;
 
     // Load Auth Database & Session
@@ -1553,12 +1555,24 @@ class AppState extends ChangeNotifier {
         _studentClass = row['class_name'] ?? row['class_level'] ?? _studentClass;
         _studentSchool = row['school'] ?? row['school_name'] ?? _studentSchool;
 
-        // Sync avatar from web — if avatar_url exists in DB and starts with http or data:, use it
+        // Sync avatar from web — if avatar_url exists in DB, cache the bytes in memory
         final dbAvatar = row['avatar_url'] ?? '';
-        if (dbAvatar.isNotEmpty && (dbAvatar.startsWith('http') || dbAvatar.startsWith('data:') || dbAvatar.startsWith('/uploads'))) {
+        if (dbAvatar.isNotEmpty) {
           final baseUrl = 'https://preschool-wzjj.onrender.com';
-          _profileImagePath = dbAvatar.startsWith('/uploads') ? '$baseUrl$dbAvatar' : dbAvatar;
-          _prefs.setString('profile_image_path', _profileImagePath);
+          if (dbAvatar.startsWith('/uploads')) {
+            _profileImagePath = '$baseUrl$dbAvatar';
+          } else if (dbAvatar.startsWith('data:') && dbAvatar.contains(',')) {
+            // Store base64 data URL directly — decode at display time
+            _profileImagePath = dbAvatar;
+          } else if (dbAvatar.startsWith('http')) {
+            _profileImagePath = dbAvatar;
+          }
+          // Don't save huge base64 to SharedPreferences — just save a marker
+          if (_profileImagePath.startsWith('data:')) {
+            _prefs.setString('profile_image_path', 'HAS_DB_AVATAR');
+          } else {
+            _prefs.setString('profile_image_path', _profileImagePath);
+          }
         }
 
         _xp = row['xp'] != null ? int.tryParse(row['xp'].toString()) ?? _xp : _xp;

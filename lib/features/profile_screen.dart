@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -345,7 +346,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: _profileImagePath.isNotEmpty
                               ? (_profileImagePath.startsWith('data:')
                                   ? Image.memory(
-                                      Uri.parse(_profileImagePath).data!.contentAsBytes(),
+                                      base64Decode(_profileImagePath.split(',').last),
                                       fit: BoxFit.cover,
                                       width: 102,
                                       height: 102,
@@ -378,6 +379,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           fit: BoxFit.cover,
                                           width: 102,
                                           height: 102,
+                                          errorBuilder: (_, __, ___) => Container(
+                                            width: 102, height: 102,
+                                            alignment: Alignment.center,
+                                            decoration: const BoxDecoration(
+                                              gradient: LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFEA580C)]),
+                                            ),
+                                            child: Text(initials, style: GoogleFonts.fredoka(fontSize: 38, fontWeight: FontWeight.bold, color: Colors.white)),
+                                          ),
                                         ))
                               : Container(
                                   decoration: const BoxDecoration(
