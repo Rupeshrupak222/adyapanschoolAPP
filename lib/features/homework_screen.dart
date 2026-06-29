@@ -12,10 +12,17 @@ import '../core/app_state.dart';
 Future<void> _openAttachment(BuildContext context, String? fileUrl, String? filePath, {String? defaultFileName}) async {
   final name = defaultFileName ?? (filePath != null ? filePath.split(Platform.isWindows ? '\\' : '/').last : 'Attachment');
 
-  // Try network URL first (either fileUrl or filePath starting with http)
-  final netUrl = (fileUrl != null && fileUrl.isNotEmpty && fileUrl.startsWith('http')) 
-      ? fileUrl 
-      : ((filePath != null && filePath.isNotEmpty && filePath.startsWith('http')) ? filePath : null);
+  // Construct full URL if it's a relative path
+  String? netUrl;
+  final baseUrl = 'https://preschool-wzjj.onrender.com';
+  
+  if (fileUrl != null && fileUrl.isNotEmpty) {
+    netUrl = fileUrl.startsWith('http') ? fileUrl : '$baseUrl$fileUrl';
+  } else if (filePath != null && filePath.isNotEmpty && filePath.startsWith('http')) {
+    netUrl = filePath;
+  } else if (filePath != null && filePath.isNotEmpty && filePath.startsWith('/uploads')) {
+    netUrl = '$baseUrl$filePath';
+  }
 
   if (netUrl != null) {
     final uri = Uri.tryParse(netUrl);
@@ -936,15 +943,15 @@ class _HomeworkScreenState extends State<HomeworkScreen> with SingleTickerProvid
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF59E0B),
+                                    color: const Color(0xFF2563EB),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(Icons.open_in_new_rounded, size: 12, color: Colors.white),
+                                      const Icon(Icons.download_rounded, size: 12, color: Colors.white),
                                       const SizedBox(width: 4),
-                                      Text('View', style: GoogleFonts.fredoka(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                                      Text('Download', style: GoogleFonts.fredoka(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
                                     ],
                                   ),
                                 ),
