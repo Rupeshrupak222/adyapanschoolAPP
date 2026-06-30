@@ -1598,24 +1598,18 @@ class AppState extends ChangeNotifier {
         _studentClass = row['class_name'] ?? row['class_level'] ?? _studentClass;
         _studentSchool = row['school'] ?? row['school_name'] ?? _studentSchool;
 
-        // Sync avatar from web — if avatar_url exists in DB, cache the bytes in memory
+        // Sync avatar from web — use avatar API endpoint (handles base64 conversion server-side)
         final dbAvatar = row['avatar_url'] ?? '';
         if (dbAvatar.isNotEmpty) {
-          final baseUrl = 'https://preschool-wzjj.onrender.com';
-          if (dbAvatar.startsWith('/uploads')) {
-            _profileImagePath = '$baseUrl$dbAvatar';
-          } else if (dbAvatar.startsWith('data:') && dbAvatar.contains(',')) {
-            // Store base64 data URL directly — decode at display time
+          if (dbAvatar.startsWith('http')) {
             _profileImagePath = dbAvatar;
-          } else if (dbAvatar.startsWith('http')) {
-            _profileImagePath = dbAvatar;
-          }
-          // Don't save huge base64 to SharedPreferences — just save a marker
-          if (_profileImagePath.startsWith('data:')) {
-            _prefs.setString('profile_image_path', 'HAS_DB_AVATAR');
+          } else if (dbAvatar.startsWith('/uploads')) {
+            _profileImagePath = 'https://preschool-wzjj.onrender.com$dbAvatar';
           } else {
-            _prefs.setString('profile_image_path', _profileImagePath);
+            // base64 or other format — use avatar API which serves it as an image
+            _profileImagePath = 'https://preschool-tau.vercel.app/api/avatar/${Uri.encodeComponent(email)}';
           }
+          _prefs.setString('profile_image_path', _profileImagePath);
         }
 
         _xp = row['xp'] != null ? int.tryParse(row['xp'].toString()) ?? _xp : _xp;
