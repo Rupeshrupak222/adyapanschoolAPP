@@ -560,6 +560,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       controller: _nameController,
                       hint: 'Aarav Sharma',
                       icon: Icons.person_rounded,
+                      readOnly: true,
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Please enter your name';
@@ -619,7 +620,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 height: 50,
                                 padding: const EdgeInsets.symmetric(horizontal: 14),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: const Color(0xFFF1F5F9),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(color: const Color(0xFFE2E8F0)),
                                 ),
@@ -627,19 +628,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   child: DropdownButton<String>(
                                     value: _selectedClass,
                                     isExpanded: true,
-                                    icon: const Icon(Icons.arrow_drop_down_rounded, color: AdyapanTheme.blueAccent, size: 24),
+                                    icon: const Icon(Icons.arrow_drop_down_rounded, color: AdyapanTheme.textMuted, size: 24),
                                     style: GoogleFonts.outfit(
                                       fontSize: 14,
-                                      color: AdyapanTheme.textMain,
+                                      color: const Color(0xFF64748B),
                                       fontWeight: FontWeight.bold,
                                     ),
-                                    onChanged: (String? newValue) {
-                                      if (newValue != null) {
-                                        setState(() {
-                                          _selectedClass = newValue;
-                                        });
-                                      }
-                                    },
+                                    onChanged: null,
                                     items: (() {
                                       final list = <String>[
                                         'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
@@ -673,6 +668,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 controller: _schoolController,
                                 hint: 'Adyapan Public School',
                                 icon: Icons.school_rounded,
+                                readOnly: true,
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) {
                                     return 'Please enter your school name';
