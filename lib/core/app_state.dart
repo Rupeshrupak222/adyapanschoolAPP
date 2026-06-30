@@ -1605,6 +1605,40 @@ class AppState extends ChangeNotifier {
         });
       }
 
+      // 1b. Also fetch from teacher_homework (website-assigned homework)
+      try {
+        final webHwResults = await conn.execute(
+          'SELECT h.id, h.title, h.subject, h.description, h.due_date, h.priority, h.file_name, h.file_size, h.url, t.teacher_name FROM teacher_homework h LEFT JOIN teachers t ON t.id = h.teacher_id WHERE h.status = :status ORDER BY h.created_at DESC LIMIT 50;',
+          {'status': 'active'},
+        );
+        for (final row in webHwResults.rows) {
+          final assoc = row.assoc();
+          final baseUrl = 'https://preschool-wzjj.onrender.com';
+          final fileUrl = assoc['url'] ?? '';
+          dbHomework.add({
+            'id': assoc['id'].hashCode,
+            'title': assoc['title'] ?? '',
+            'subject': assoc['subject'] ?? '',
+            'description': assoc['description'] ?? '',
+            'dueDate': assoc['due_date'] ?? '',
+            'priority': assoc['priority'] ?? 'Normal',
+            'submitted': false,
+            'submittedAt': null,
+            'addedBy': assoc['teacher_name'] ?? 'Teacher',
+            'fileName': '',
+            'filePath': '',
+            'studentComment': '',
+            'grade': 'Pending Grade',
+            'teacherFeedback': '',
+            'teacherFileName': assoc['file_name'] ?? '',
+            'teacherFilePath': '',
+            'teacherFileUrl': fileUrl.startsWith('http') ? fileUrl : (fileUrl.startsWith('/') ? '$baseUrl$fileUrl' : fileUrl),
+          });
+        }
+      } catch (e) {
+        print('⚠️ teacher_homework fetch: $e');
+      }
+
       // 2. Fetch student's submissions
       final subResults = await conn.execute(
         'SELECT homework_id, student_email, student_name, submitted_at, file_name, file_path, student_comment, grade, teacher_feedback FROM app_homework_submissions WHERE student_email = :email;',
