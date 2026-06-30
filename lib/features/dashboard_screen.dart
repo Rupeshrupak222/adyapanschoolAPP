@@ -504,6 +504,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
+                                      if (state.studentClass.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 2.0),
+                                          child: Text(
+                                            state.studentClass,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 11,
+                                              color: const Color(0xFF1E3A8A).withOpacity(0.8),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
                                     ],
                                   ),
                                 ),
@@ -548,89 +560,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.school_rounded, color: Color(0xFF1E3A8A), size: 16),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Active Class:',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: const Color(0xFF1E3A8A).withOpacity(0.8),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Container(
-                                  height: 32,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.85),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFF1E3A8A).withOpacity(0.15)),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFF1E3A8A).withOpacity(0.04),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      )
-                                    ],
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: state.studentClass,
-                                      icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF1E3A8A), size: 20),
-                                      style: GoogleFonts.fredoka(
-                                        fontSize: 12,
-                                        color: const Color(0xFF1E3A8A),
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      onChanged: (String? newValue) {
-                                        if (newValue != null) {
-                                          state.updateProfile(
-                                            name: state.studentName,
-                                            email: state.studentEmail,
-                                            phone: state.studentPhone,
-                                            className: newValue,
-                                            school: state.studentSchool,
-                                            imagePath: state.profileImagePath.isNotEmpty ? state.profileImagePath : null,
-                                          );
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                '🎉 Content switched to $newValue successfully!',
-                                                style: GoogleFonts.fredoka(color: Colors.white, fontSize: 13),
-                                              ),
-                                              backgroundColor: const Color(0xFF10B981),
-                                              behavior: SnackBarBehavior.floating,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                            ),
-                                          );
-                                        }
-                                      },
-                                      items: <String>[
-                                        'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
-                                        'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10',
-                                        'Class 11', 'Class 12'
-                                      ].map<DropdownMenuItem<String>>((String value) {
-                                        return DropdownMenuItem<String>(
-                                          value: value,
-                                          child: Text(value),
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
+
 
                           // Header Image Banner
                           Expanded(
