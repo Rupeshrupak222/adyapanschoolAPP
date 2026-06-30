@@ -1527,7 +1527,7 @@ class AppState extends ChangeNotifier {
     try {
       final conn = await DbHelper.getConnection();
       final results = await conn.execute(
-        'SELECT name, phone, class_name, class_level, school, school_name, xp, level, streak, completed_quizzes, avatar_url FROM users WHERE LOWER(email) = :email;',
+        'SELECT name, phone, class_name, class_level, school, school_name, xp, level, streak, completed_quizzes FROM users WHERE LOWER(email) = :email;',
         {'email': email.toLowerCase().trim()},
       );
       if (results.rows.isNotEmpty) {
@@ -1537,17 +1537,10 @@ class AppState extends ChangeNotifier {
         _studentClass = row['class_name'] ?? row['class_level'] ?? _studentClass;
         _studentSchool = row['school'] ?? row['school_name'] ?? _studentSchool;
 
-        // Sync avatar from web — use avatar API endpoint (handles base64 conversion server-side)
-        final dbAvatar = row['avatar_url'] ?? '';
-        if (dbAvatar.isNotEmpty) {
-          if (dbAvatar.startsWith('http')) {
-            _profileImagePath = dbAvatar;
-          } else if (dbAvatar.startsWith('/uploads')) {
-            _profileImagePath = 'https://preschool-wzjj.onrender.com$dbAvatar';
-          } else {
-            // base64 or other format — use avatar API which serves it as an image
-            _profileImagePath = 'https://preschool-tau.vercel.app/api/avatar/${Uri.encodeComponent(email)}';
-          }
+        // Set avatar URL via API endpoint (works for both web-uploaded and app-uploaded avatars)
+        // The API at /api/avatar/email handles base64 conversion server-side
+        if (_profileImagePath.isEmpty) {
+          _profileImagePath = 'https://preschool-tau.vercel.app/api/avatar?email=${Uri.encodeComponent(email)}';
           _prefs.setString('profile_image_path', _profileImagePath);
         }
 
