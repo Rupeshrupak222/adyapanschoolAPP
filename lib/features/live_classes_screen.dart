@@ -561,16 +561,16 @@ class _LiveStreamClassPageState extends State<LiveStreamClassPage> {
   Timer? _quizDismissTimer;
 
   final List<Map<String, String>> _chatMessages = [
-    {'sender': 'Anya Verma', 'message': 'Good morning Ma\'am!'},
-    {'sender': 'Kabir Gupta', 'message': 'Is this session being recorded?'},
+    {'sender': 'Student 1', 'message': 'Good morning Ma\'am!'},
+    {'sender': 'Student 2', 'message': 'Is this session being recorded?'},
   ];
   Timer? _chatTimer;
   final List<Map<String, String>> _mockChatPool = [
     {'sender': 'Mrs. Sharma', 'message': 'Yes, the recording will be in the library!'},
-    {'sender': 'Rohan Malhotra', 'message': 'Wow, the BODMAS rules make absolute sense now.'},
-    {'sender': 'Anya Verma', 'message': 'Ma\'am, will we practice fraction division today?'},
+    {'sender': 'Student 3', 'message': 'Wow, the BODMAS rules make absolute sense now.'},
+    {'sender': 'Student 1', 'message': 'Ma\'am, will we practice fraction division today?'},
     {'sender': 'Mrs. Sharma', 'message': 'Yes Anya, right after this arithmetic quest!'},
-    {'sender': 'Kabir Gupta', 'message': 'I have secured the BODMAS game badge!'},
+    {'sender': 'Student 2', 'message': 'I have secured the BODMAS game badge!'},
   ];
   int _chatPoolIndex = 0;
 
@@ -626,7 +626,7 @@ class _LiveStreamClassPageState extends State<LiveStreamClassPage> {
       _quizSubmitted = true;
     });
     state.submitLiveQuizAnswer(
-      'Aarav Sharma',
+      state.studentName.isNotEmpty ? state.studentName : 'Student',
       options[index],
       index == correctIndex,
     );

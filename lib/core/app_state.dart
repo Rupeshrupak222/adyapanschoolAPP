@@ -376,6 +376,7 @@ class AppState extends ChangeNotifier {
       _recordedLectures = List<Map<String, dynamic>>.from(jsonDecode(recordedJson));
     } else {
       _recordedLectures = [];
+      _recordedLectures = []; // No demo data — fetch real ones from DB
       _saveRecordedLectures();
     }
 
@@ -385,6 +386,7 @@ class AppState extends ChangeNotifier {
       _teacherMessages = List<Map<String, dynamic>>.from(jsonDecode(messagesJson));
     } else {
       _teacherMessages = [];
+      _teacherMessages = []; // No demo messages — fetch real ones from DB
       _saveTeacherMessages();
     }
 
@@ -421,6 +423,7 @@ class AppState extends ChangeNotifier {
       _teacherFeedbacks = List<Map<String, dynamic>>.from(jsonDecode(feedbacksJson));
     } else {
       _teacherFeedbacks = [];
+      _teacherFeedbacks = []; // No demo data
       _saveTeacherFeedbacks();
     }
 

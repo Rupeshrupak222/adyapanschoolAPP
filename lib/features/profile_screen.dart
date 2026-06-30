@@ -558,7 +558,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildInputLabel('Full Name'),
                     _buildTextFormField(
                       controller: _nameController,
-                      hint: 'Aarav Sharma',
+                      hint: 'Your full name',
                       icon: Icons.person_rounded,
                       readOnly: true,
                       validator: (value) {
@@ -574,7 +574,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildInputLabel('Email Address'),
                     _buildTextFormField(
                       controller: _emailController,
-                      hint: 'aarav.sharma@school.com',
+                      hint: 'your.email@school.com',
                       icon: Icons.email_rounded,
                       keyboardType: TextInputType.emailAddress,
                       readOnly: true,

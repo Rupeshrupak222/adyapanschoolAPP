@@ -131,8 +131,10 @@ class _AppLayoutState extends State<AppLayout> with WidgetsBindingObserver {
 
   void _showChatbotDialog(BuildContext context) {
     final messageController = TextEditingController();
+    final studentName = Provider.of<AppState>(context, listen: false).studentName;
+    final firstName = studentName.isNotEmpty ? studentName.split(' ').first : 'Student';
     final List<Map<String, dynamic>> initialMessages = [
-      {'sender': 'bot', 'text': 'Hello Aarav! I am Adyapan AI Assistant. How can I help you study today?'},
+      {'sender': 'bot', 'text': 'Hello $firstName! I am Adyapan AI Assistant. How can I help you study today?'},
     ];
 
     showDialog(
@@ -264,7 +266,7 @@ class _AppLayoutState extends State<AppLayout> with WidgetsBindingObserver {
                                       } else if (text.toLowerCase().contains('xp') || text.toLowerCase().contains('level')) {
                                         botReply = "You can earn XP by completing focus sessions, homework, and roadmaps!";
                                       } else if (text.toLowerCase().contains('hello') || text.toLowerCase().contains('hi')) {
-                                        botReply = "Hello Aarav! How are you doing today? Ready to learn something new?";
+                                        botReply = "Hello! How are you doing today? Ready to learn something new?";
                                       }
                                       setDialogState(() {
                                         messages.add({'sender': 'bot', 'text': botReply});
@@ -293,7 +295,7 @@ class _AppLayoutState extends State<AppLayout> with WidgetsBindingObserver {
                                   } else if (text.toLowerCase().contains('xp') || text.toLowerCase().contains('level')) {
                                     botReply = "You can earn XP by completing focus sessions, homework, and roadmaps!";
                                   } else if (text.toLowerCase().contains('hello') || text.toLowerCase().contains('hi')) {
-                                    botReply = "Hello Aarav! How are you doing today? Ready to learn something new?";
+                                    botReply = "Hello! How are you doing today? Ready to learn something new?";
                                   }
                                   setDialogState(() {
                                     messages.add({'sender': 'bot', 'text': botReply});
