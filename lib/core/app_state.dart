@@ -660,14 +660,14 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateProfile({
+  Future<bool> updateProfile({
     required String name,
     required String email,
     required String phone,
     required String className,
     required String school,
     String? imagePath,
-  }) {
+  }) async {
     _studentName = name;
     _studentEmail = email;
     _studentPhone = phone;
@@ -687,6 +687,49 @@ class AppState extends ChangeNotifier {
     }
     
     notifyListeners();
+
+    bool success = false;
+    
+    // 1. Update via Node.js API (updates dual databases)
+    try {
+      final api = ApiService();
+      final response = await api.updateProfile({
+        'name': name,
+        'phone': phone,
+        'class_name': className,
+        'class_level': className,
+        'school_name': school,
+      });
+      if (response != null && response['success'] == true) {
+        success = true;
+        print('✅ API profile update successful');
+      }
+    } catch (e) {
+      print('⚠️ API profile update failed: $e');
+    }
+
+    // 2. Fallback/Mirror: Update directly in TiDB database
+    try {
+      final conn = await DbHelper.getConnection();
+      await conn.execute('''
+        UPDATE users 
+        SET name = :name, phone = :phone, class_name = :className, class_level = :className, 
+            school = :school, school_name = :school, updated_at = NOW()
+        WHERE LOWER(email) = :email;
+      ''', {
+        'name': name,
+        'phone': phone,
+        'className': className,
+        'school': school,
+        'email': email.toLowerCase().trim(),
+      });
+      success = true; // If direct DB succeeded, count as success
+      print('✅ Direct DB profile update successful');
+    } catch (e) {
+      print('⚠️ Direct DB profile update failed: $e');
+    }
+
+    return success;
   }
 
   void updateProfileImage(String path) {

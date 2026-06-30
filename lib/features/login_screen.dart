@@ -32,6 +32,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   DateTime? _lastBackPressed;
   late AnimationController _animationController;
   String _userRole = 'student'; // 'student' or 'teacher'
+  bool _isLoading = false;
+  bool _isPressed = false;
 
   @override
   void initState() {
@@ -80,6 +82,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 
   void _handleLogin() async {
+    if (_isLoading) return;
     final state = Provider.of<AppState>(context, listen: false);
 
     final email = _emailController.text.trim().toLowerCase();
@@ -115,6 +118,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       }
     }
 
+    setState(() {
+      _isLoading = true;
+    });
+
     // Save credentials role-specifically
     final roleKey = _userRole == 'teacher' ? 'teacher_saved_email' : 'student_saved_email';
     if (_saveCredentials) {
@@ -133,12 +140,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       String errorMsg = '';
       try {
         dbSuccess = await state.loginUser(email, password, role: 'teacher', staffKey: teacherKey);
-        if (!mounted) return;
       } catch (e) {
-        if (!mounted) return;
         dbSuccess = false;
         errorMsg = e.toString().replaceFirst('Exception: ', '');
       }
+
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
 
       if (!dbSuccess) {
         ScaffoldMessenger.of(context).clearSnackBars();
@@ -181,12 +192,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     String errorMsg = '';
     try {
       loginSuccess = await state.loginUser(email, password);
-      if (!mounted) return;
     } catch (e) {
-      if (!mounted) return;
       loginSuccess = false;
       errorMsg = e.toString().replaceFirst('Exception: ', '');
     }
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+    });
 
     if (loginSuccess) {
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -985,37 +1000,65 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           const SizedBox(height: 16),
 
                           // LOGIN GRADIENT BUTTON (Blue to Pink/Magenta)
-                          GestureDetector(
-                            onTap: _handleLogin,
-                            child: Container(
-                              width: double.infinity,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFF2563EB), // Vibrant blue
-                                    Color(0xFFEC4899), // Hot pink
+                          AnimatedScale(
+                            scale: _isLoading ? 0.98 : (_isPressed ? 0.95 : 1.0),
+                            duration: const Duration(milliseconds: 100),
+                            child: GestureDetector(
+                              onTapDown: (_) {
+                                if (!_isLoading) {
+                                  setState(() => _isPressed = true);
+                                }
+                              },
+                              onTapUp: (_) {
+                                if (!_isLoading) {
+                                  setState(() => _isPressed = false);
+                                }
+                              },
+                              onTapCancel: () {
+                                if (!_isLoading) {
+                                  setState(() => _isPressed = false);
+                                }
+                              },
+                              onTap: _isLoading ? null : _handleLogin,
+                              child: Container(
+                                width: double.infinity,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF2563EB), // Vibrant blue
+                                      Color(0xFFEC4899), // Hot pink
+                                    ],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF2563EB).withOpacity(0.3),
+                                      blurRadius: 15,
+                                      offset: const Offset(0, 8),
+                                    )
                                   ],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
                                 ),
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF2563EB).withOpacity(0.3),
-                                    blurRadius: 15,
-                                    offset: const Offset(0, 8),
-                                  )
-                                ],
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                state.translate('Log In'),
-                                style: GoogleFonts.fredoka(
-                                  fontSize: 16, 
-                                  fontWeight: FontWeight.bold, 
-                                  color: Colors.white,
-                                ),
+                                alignment: Alignment.center,
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : Text(
+                                        state.translate('Log In'),
+                                        style: GoogleFonts.fredoka(
+                                          fontSize: 16, 
+                                          fontWeight: FontWeight.bold, 
+                                          color: Colors.white,
+                                        ),
+                                      ),
                               ),
                             ),
                           ),
