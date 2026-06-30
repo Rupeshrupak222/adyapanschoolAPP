@@ -343,52 +343,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                         child: ClipOval(
-                          child: _profileImagePath.isNotEmpty
-                              ? (_profileImagePath.startsWith('data:')
-                                  ? Image.memory(
-                                      base64Decode(_profileImagePath.split(',').last),
-                                      fit: BoxFit.cover,
-                                      width: 102,
-                                      height: 102,
-                                      errorBuilder: (_, __, ___) => Container(
-                                        width: 102, height: 102,
-                                        alignment: Alignment.center,
-                                        decoration: const BoxDecoration(
-                                          gradient: LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFEA580C)]),
-                                        ),
-                                        child: Text(initials, style: GoogleFonts.fredoka(fontSize: 38, fontWeight: FontWeight.bold, color: Colors.white)),
-                                      ),
-                                    )
-                                  : _profileImagePath.startsWith('http')
-                                      ? Image.network(
-                                          _profileImagePath,
-                                          fit: BoxFit.cover,
-                                          width: 102,
-                                          height: 102,
-                                          errorBuilder: (_, __, ___) => Container(
-                                            width: 102, height: 102,
-                                            alignment: Alignment.center,
-                                            decoration: const BoxDecoration(
-                                              gradient: LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFEA580C)]),
-                                            ),
-                                            child: Text(initials, style: GoogleFonts.fredoka(fontSize: 38, fontWeight: FontWeight.bold, color: Colors.white)),
-                                          ),
-                                        )
-                                      : Image.file(
-                                          File(_profileImagePath),
-                                          fit: BoxFit.cover,
-                                          width: 102,
-                                          height: 102,
-                                          errorBuilder: (_, __, ___) => Container(
-                                            width: 102, height: 102,
-                                            alignment: Alignment.center,
-                                            decoration: const BoxDecoration(
-                                              gradient: LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFEA580C)]),
-                                            ),
-                                            child: Text(initials, style: GoogleFonts.fredoka(fontSize: 38, fontWeight: FontWeight.bold, color: Colors.white)),
-                                          ),
-                                        ))
-                              : Container(
+                          child: _profileImagePath.isNotEmpty && _profileImagePath.startsWith('http')
+                              ? Image.network(
+                                  _profileImagePath,
+                                  fit: BoxFit.cover,
+                                  width: 102,
+                                  height: 102,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 102, height: 102,
+                                    alignment: Alignment.center,
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFEA580C)]),
+                                    ),
+                                    child: Text(initials, style: GoogleFonts.fredoka(fontSize: 38, fontWeight: FontWeight.bold, color: Colors.white)),
+                                  ),
+                                )
+                              : _profileImagePath.isNotEmpty && !_profileImagePath.startsWith('http') && File(_profileImagePath).existsSync()
+                                  ? Image.file(File(_profileImagePath), fit: BoxFit.cover, width: 102, height: 102)
+                                  : Container(
                                   decoration: const BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [Color(0xFFFBBF24), Color(0xFFEA580C)],
