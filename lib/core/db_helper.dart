@@ -269,6 +269,8 @@ class DbHelper {
       try { await _conn!.execute('ALTER TABLE app_homework ADD COLUMN file_name VARCHAR(255);'); } catch (_) {}
       try { await _conn!.execute('ALTER TABLE app_homework ADD COLUMN file_path TEXT;'); } catch (_) {}
       try { await _conn!.execute('ALTER TABLE app_homework ADD COLUMN file_url TEXT;'); } catch (_) {}
+      try { await _conn!.execute('ALTER TABLE app_homework_submissions MODIFY COLUMN file_path LONGTEXT;'); } catch (_) {}
+      try { await _conn!.execute('ALTER TABLE homework_submissions MODIFY COLUMN file_url LONGTEXT;'); } catch (_) {}
     } catch (e) {
       print('❌ Database table initialization failed: $e');
     }

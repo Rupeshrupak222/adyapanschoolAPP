@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,6 +25,53 @@ Future<void> _openAttachment(BuildContext context, String? fileUrl, String? file
     netUrl = filePath;
   } else if (filePath != null && filePath.isNotEmpty && filePath.startsWith('/uploads')) {
     netUrl = '$baseUrl$filePath';
+  }
+
+  // Handle base64 Data URL decoding directly
+  final checkUrl = fileUrl ?? filePath ?? '';
+  if (checkUrl.startsWith('data:')) {
+    try {
+      final parts = checkUrl.split(',');
+      if (parts.length > 1) {
+        final base64Data = parts.last;
+        final bytes = base64Decode(base64Data);
+        
+        final dir = Directory('/storage/emulated/0/Download');
+        final downloadsDir = dir.existsSync() ? dir : Directory('/storage/emulated/0/Documents');
+        if (!downloadsDir.existsSync()) {
+          downloadsDir.createSync(recursive: true);
+        }
+        
+        final safeName = name.replaceAll(RegExp(r'[^\w\s\-\.]'), '_');
+        final savePath = '${downloadsDir.path}/$safeName';
+        final file = File(savePath);
+        await file.writeAsBytes(bytes);
+        
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Decoded to: ${file.path}', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Open',
+              textColor: Colors.white,
+              onPressed: () async {
+                final uri = Uri.file(file.path);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ),
+        );
+        return;
+      }
+    } catch (e) {
+      debugPrint('Failed to decode base64 attachment: $e');
+    }
   }
 
   if (netUrl != null) {

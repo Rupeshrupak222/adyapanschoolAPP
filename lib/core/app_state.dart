@@ -270,12 +270,7 @@ class AppState extends ChangeNotifier {
     if (todosJson != null) {
       _todos = List<Map<String, dynamic>>.from(jsonDecode(todosJson));
     } else {
-      // Default initial tasks
-      _todos = [
-        {'id': 1, 'title': 'Solve 5 Algebra Quizzes', 'tag': 'Math', 'completed': false},
-        {'id': 2, 'title': 'Complete Atomic Shell Game', 'tag': 'Science', 'completed': true},
-        {'id': 3, 'title': '25 Mins Focus Session', 'tag': 'Focus', 'completed': false},
-      ];
+      _todos = [];
       _saveTodos();
     }
 
@@ -379,26 +374,7 @@ class AppState extends ChangeNotifier {
     if (recordedJson != null) {
       _recordedLectures = List<Map<String, dynamic>>.from(jsonDecode(recordedJson));
     } else {
-      _recordedLectures = [
-        {
-          'title': 'BODMAS Foundations & Algebra',
-          'duration': 'Recorded • 45 mins',
-          'teacher': 'Mrs. Sharma',
-          'emoji': '📐',
-        },
-        {
-          'title': 'Solar System Orbit & Velocities',
-          'duration': 'Recorded • 50 mins',
-          'teacher': 'Mr. Verma',
-          'emoji': '⚛️',
-        },
-        {
-          'title': 'Active and Passive Voice Rules',
-          'duration': 'Recorded • 40 mins',
-          'teacher': 'Miss Anjali',
-          'emoji': '📖',
-        },
-      ];
+      _recordedLectures = [];
       _saveRecordedLectures();
     }
 
@@ -407,38 +383,7 @@ class AppState extends ChangeNotifier {
     if (messagesJson != null) {
       _teacherMessages = List<Map<String, dynamic>>.from(jsonDecode(messagesJson));
     } else {
-      _teacherMessages = [
-        {
-          'id': 'msg_01',
-          'studentName': 'Aarav Sharma',
-          'teacherName': 'Mrs. Aarushi Sharma (Maths HOD)',
-          'message': 'Dear Parents, Aarav has shown great performance in BODMAS balancing, but we have scheduled a Parents-Teacher Meeting (PTM) for this Friday at 3:00 PM to discuss the upcoming calculus roadmap. Please accept/confirm if you will be attending.',
-          'category': 'Meeting Request',
-          'isRead': false,
-          'date': 'Today',
-          'meetingResponse': '',
-        },
-        {
-          'id': 'msg_02',
-          'studentName': 'Aarav Sharma',
-          'teacherName': 'Mr. Ramesh Verma (Science Head)',
-          'message': 'Weekly Alert: Aarav completed the Physics Orbitals modules successfully! He gained +80 XP. However, his daily screen limit on study games should be regulated to 90 mins to maintain balanced health. Focus shield status: Optimal.',
-          'category': 'Syllabus Alert',
-          'isRead': true,
-          'date': 'Yesterday',
-          'meetingResponse': '',
-        },
-        {
-          'id': 'msg_03',
-          'studentName': 'Aarav Sharma',
-          'teacherName': 'Adyapan Smart System',
-          'message': 'System Notice: Focus Zen Master Rank badge has been unlocked for Aarav Sharma! Daily average study efficiency is currently at 78% which is outstanding.',
-          'category': 'Notice',
-          'isRead': true,
-          'date': '2 days ago',
-          'meetingResponse': '',
-        },
-      ];
+      _teacherMessages = [];
       _saveTeacherMessages();
     }
 
@@ -456,22 +401,7 @@ class AppState extends ChangeNotifier {
     if (schedulesJson != null) {
       _studySchedules = List<Map<String, dynamic>>.from(jsonDecode(schedulesJson));
     } else {
-      _studySchedules = [
-        {
-          'id': 'sched_1',
-          'title': 'Evening Homework Focus',
-          'start': '17:00',
-          'end': '19:00',
-          'isActive': true,
-        },
-        {
-          'id': 'sched_2',
-          'title': 'Morning Revision Lock',
-          'start': '08:00',
-          'end': '09:00',
-          'isActive': false,
-        }
-      ];
+      _studySchedules = [];
       _saveStudySchedules();
     }
 
@@ -489,17 +419,7 @@ class AppState extends ChangeNotifier {
     if (feedbacksJson != null) {
       _teacherFeedbacks = List<Map<String, dynamic>>.from(jsonDecode(feedbacksJson));
     } else {
-      _teacherFeedbacks = [
-        {
-          'teacherName': 'Mrs. Sharma',
-          'subjectName': 'Mathematics',
-          'lectureTitle': 'Classroom Session',
-          'rating': 5.0,
-          'tags': ['Clear Explanations', 'Fun Activities'],
-          'comments': 'Great class! Loved the puzzle.',
-          'timestamp': DateTime.now().toIso8601String(),
-        }
-      ];
+      _teacherFeedbacks = [];
       _saveTeacherFeedbacks();
     }
 
@@ -1071,8 +991,27 @@ class AppState extends ChangeNotifier {
     if (index == -1 || _homeworkList[index]['submitted'] == true) return false;
     
     String? finalPath = filePath;
-    if (filePath != null && filePath.isNotEmpty && !filePath.startsWith('http')) {
-      finalPath = await DbHelper.uploadFile(filePath);
+    if (filePath != null && filePath.isNotEmpty && !filePath.startsWith('http') && !filePath.startsWith('data:')) {
+      try {
+        final file = File(filePath);
+        if (file.existsSync()) {
+          final bytes = await file.readAsBytes();
+          final base64String = base64Encode(bytes);
+          final ext = filePath.split('.').last.toLowerCase();
+          String mimeType = 'application/octet-stream';
+          if (ext == 'jpg' || ext == 'jpeg') {
+            mimeType = 'image/jpeg';
+          } else if (ext == 'png') {
+            mimeType = 'image/png';
+          } else if (ext == 'pdf') {
+            mimeType = 'application/pdf';
+          }
+          finalPath = 'data:$mimeType;base64,$base64String';
+        }
+      } catch (e) {
+        print('❌ Failed to convert file to base64: $e');
+        finalPath = await DbHelper.uploadFile(filePath);
+      }
     }
 
     final now = DateTime.now();
@@ -1697,10 +1636,8 @@ class AppState extends ChangeNotifier {
       }
 
       // Update active homework list if any homework was fetched
-      if (dbHomework.isNotEmpty) {
-        _homeworkList = dbHomework;
-        _saveHomework();
-      }
+      _homeworkList = dbHomework;
+      _saveHomework();
 
       // 4. Fetch notes from app_notes
       final notesResults = await conn.execute(
@@ -1725,10 +1662,8 @@ class AppState extends ChangeNotifier {
         });
       }
 
-      if (dbNotes.isNotEmpty) {
-        _notesList = dbNotes;
-        _saveNotes();
-      }
+      _notesList = dbNotes;
+      _saveNotes();
 
       notifyListeners();
       print('✅ TiDB Homework and Notes sync complete! Total Homework: ${_homeworkList.length}, Total Notes: ${_notesList.length}');
@@ -1759,11 +1694,9 @@ class AppState extends ChangeNotifier {
       } else {
         dbMessages = await DbHelper.getTeacherMessages(_studentName);
       }
-      if (dbMessages.isNotEmpty) {
-        _teacherMessages = dbMessages;
-        _saveTeacherMessages();
-        notifyListeners();
-      }
+      _teacherMessages = dbMessages;
+      _saveTeacherMessages();
+      notifyListeners();
       print('✅ TiDB teacher messages sync complete! Total: ${_teacherMessages.length}');
     } catch (e) {
       print('⚠️ Failed to sync teacher messages: $e');
@@ -1795,11 +1728,9 @@ class AppState extends ChangeNotifier {
     print('🔄 Synchronizing live classes from TiDB Cloud database...');
     try {
       final dbLive = await DbHelper.getLiveClasses(tId);
-      if (dbLive.isNotEmpty) {
-        _liveClassesSchedule = dbLive;
-        _saveLiveClassesSchedule();
-        notifyListeners();
-      }
+      _liveClassesSchedule = dbLive;
+      _saveLiveClassesSchedule();
+      notifyListeners();
       print('✅ TiDB live classes sync complete! Total: ${_liveClassesSchedule.length}');
     } catch (e) {
       print('⚠️ Failed to sync live classes: $e');
@@ -2420,11 +2351,9 @@ class AppState extends ChangeNotifier {
     print('🔄 Synchronizing recorded lectures from TiDB Cloud database...');
     try {
       final dbLectures = await DbHelper.getRecordedLectures();
-      if (dbLectures.isNotEmpty) {
-        _recordedLectures = dbLectures;
-        _saveRecordedLectures();
-        notifyListeners();
-      }
+      _recordedLectures = dbLectures;
+      _saveRecordedLectures();
+      notifyListeners();
       print('✅ TiDB recorded lectures sync complete! Total: ${_recordedLectures.length}');
     } catch (e) {
       print('⚠️ Failed to sync recorded lectures: $e');
@@ -2435,10 +2364,8 @@ class AppState extends ChangeNotifier {
     print('🔄 Synchronizing leaderboard from TiDB Cloud database...');
     try {
       final dbLeaderboard = await DbHelper.getLeaderboardData();
-      if (dbLeaderboard.isNotEmpty) {
-        _leaderboard = dbLeaderboard;
-        notifyListeners();
-      }
+      _leaderboard = dbLeaderboard;
+      notifyListeners();
       print('✅ TiDB leaderboard sync complete! Total: ${_leaderboard.length}');
     } catch (e) {
       print('⚠️ Failed to sync leaderboard: $e');
