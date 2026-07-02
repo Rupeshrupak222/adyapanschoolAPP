@@ -651,7 +651,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _buildStatsCol('${state.notesList.length + state.completedQuizzesCount + 12}', state.translate('LESSONS')),
+                        _buildStatsCol('${state.notesList.length + state.completedQuizzesCount}', state.translate('LESSONS')),
                         Container(width: 1.5, height: 28, color: const Color(0xFFEFF6FF)),
                         _buildStatsCol('${state.homeworkList.where((h) => h['submitted'] == false).length}', state.translate('QUESTS')),
                         Container(width: 1.5, height: 28, color: const Color(0xFFEFF6FF)),
@@ -1337,7 +1337,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                      ),
                      child: Column(
                         children: [
-                          _buildLeaderboardRow(1, 'Priya Sharma', '2,840 XP', true),
+                          _buildLeaderboardRow(1, state.studentName.isNotEmpty ? state.studentName : 'You', '${state.xp} XP', true),
                           const Divider(height: 16, color: Color(0xFFFDE68A)),
                           _buildLeaderboardRow(2, 'Arjun Mehta', '2,610 XP', false),
                           const Divider(height: 16, color: Color(0xFFFDE68A)),

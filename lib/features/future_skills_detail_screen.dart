@@ -310,7 +310,7 @@ class _FutureSkillsDetailScreenState extends State<FutureSkillsDetailScreen>
         'explanation': 'The first 3 seconds of a speech are vital. A "Hook" captures the room instantly: start with a dramatic statistic, question, or quote instead of standard introductions.',
         'options': [
           'A shocking statistic or dramatic query to hook focus',
-          'Saying "My name is Aarav, and today I will talk about..."'
+          'Saying "My name is [your name], and today I will talk about..."'
         ],
         'correctIndex': 0,
         'motivation': 'Perfect! An evocative hook immediately gathers the audience\'s attention.'

@@ -1621,23 +1621,55 @@ class DbHelper {
   static Future<List<Map<String, dynamic>>> getRecordedLectures() async {
     try {
       final conn = await getConnection();
-      final results = await conn.execute('''
-        SELECT id, title, duration, teacher, emoji, video_url
-        FROM app_recorded_lectures
-        ORDER BY created_at DESC;
-      ''');
       final list = <Map<String, dynamic>>[];
-      for (final row in results.rows) {
-        final assoc = row.assoc();
-        list.add({
-          'id': int.tryParse(assoc['id'] ?? '') ?? 0,
-          'title': assoc['title'] ?? '',
-          'duration': assoc['duration'] ?? '',
-          'teacher': assoc['teacher'] ?? '',
-          'emoji': assoc['emoji'] ?? '📹',
-          'videoUrl': assoc['video_url'] ?? 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
-        });
+
+      // Fetch from app_recorded_lectures (uploaded via app)
+      try {
+        final results = await conn.execute('''
+          SELECT id, title, duration, teacher, emoji, video_url
+          FROM app_recorded_lectures
+          ORDER BY created_at DESC;
+        ''');
+        for (final row in results.rows) {
+          final assoc = row.assoc();
+          list.add({
+            'id': int.tryParse(assoc['id'] ?? '') ?? 0,
+            'title': assoc['title'] ?? '',
+            'duration': assoc['duration'] ?? '',
+            'teacher': assoc['teacher'] ?? '',
+            'emoji': assoc['emoji'] ?? '📹',
+            'videoUrl': assoc['video_url'] ?? '',
+          });
+        }
+      } catch (_) {}
+
+      // Also fetch from teacher_recordings (uploaded via website)
+      try {
+        final webResults = await conn.execute('''
+          SELECT r.id, r.title, r.duration, r.subject, r.url, r.file_name, t.teacher_name
+          FROM teacher_recordings r
+          LEFT JOIN teachers t ON t.id = r.teacher_id
+          WHERE r.status = 'active'
+          ORDER BY r.created_at DESC
+          LIMIT 50;
+        ''');
+        for (final row in webResults.rows) {
+          final assoc = row.assoc();
+          final url = assoc['url'] ?? '';
+          final baseUrl = 'https://preschool-wzjj.onrender.com';
+          list.add({
+            'id': assoc['id'] ?? '',
+            'title': assoc['title'] ?? 'Recorded Class',
+            'duration': assoc['duration'] ?? 'Recorded',
+            'teacher': assoc['teacher_name'] ?? 'Teacher',
+            'emoji': '🎬',
+            'videoUrl': url.startsWith('http') ? url : (url.startsWith('/') ? '$baseUrl$url' : url),
+          });
+        }
+      } catch (e) {
+        print('⚠️ teacher_recordings fetch: $e');
       }
+
       return list;
     } catch (e) {
       print('❌ Failed to fetch recorded lectures: $e');

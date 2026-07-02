@@ -534,14 +534,7 @@ class _TeacherProgressView extends StatelessWidget {
               'status': status,
             };
           }).toList()
-        : [
-            {'name': 'Anya Verma',     'math': 88.0, 'science': 92.0, 'english': 78.0, 'attendance': 96.0, 'xp': 2450, 'status': 'top'},
-            {'name': 'Kabir Gupta',    'math': 76.0, 'science': 84.0, 'english': 90.0, 'attendance': 92.0, 'xp': 2310, 'status': 'good'},
-            {'name': 'Rohan Malhotra', 'math': 65.0, 'science': 70.0, 'english': 60.0, 'attendance': 85.0, 'xp': 2190, 'status': 'average'},
-            {'name': 'Diya Sen',       'math': 92.0, 'science': 88.0, 'english': 95.0, 'attendance': 98.0, 'xp': 1900, 'status': 'top'},
-            {'name': 'Ishaan Mehta',   'math': 55.0, 'science': 62.0, 'english': 58.0, 'attendance': 74.0, 'xp': 1450, 'status': 'struggling'},
-            {'name': 'Meera Iyer',     'math': 80.0, 'science': 75.0, 'english': 82.0, 'attendance': 90.0, 'xp': 2500, 'status': 'good'},
-          ];
+        : []; // No fallback demo data — show empty state
 
     double classAvg(String key) {
       if (classStudents.isEmpty) return 0.0;

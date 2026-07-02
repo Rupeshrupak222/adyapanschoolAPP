@@ -52,27 +52,47 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> with Wi
   String _selectedCategory = 'Praise';
   final TextEditingController _communicationMsgCtrl = TextEditingController();
 
-  // Doubts mock data
-  List<Map<String, dynamic>> _mockDoubts = [
-    {
-      'id': 1,
-      'studentName': 'Rahul Sharma',
-      'studentClass': 'Class 10',
-      'question': 'Ma\'am, in BODMAS rule, does division always get executed before multiplication? What if they are written as 8 / 2 * 4?',
-      'replied': false,
-      'replyText': '',
-      'time': '10 mins ago',
-    },
-    {
-      'id': 2,
-      'studentName': 'Priya Patel',
-      'studentClass': 'Class 10',
-      'question': 'How does the Python Syntax block for conditional loop execution construct properly? I am having trouble with Level 3.',
-      'replied': true,
-      'replyText': 'Great question, Priya! In Level 3, make sure your indentation for print statement inside "if score > 50:" matches precisely. It requires 4 spaces!',
-      'time': '1 hour ago',
+  // Doubts — fetched from real DB via state.doubts
+  List<Map<String, dynamic>> get _mockDoubts => _buildDoubtsFromState();
+
+  /// Converts real doubts from AppState (student doubts sent to this teacher) to the format used by the UI
+  List<Map<String, dynamic>> _buildDoubtsFromState() {
+    final state = Provider.of<AppState>(context, listen: false);
+    return state.doubts.map((d) => {
+      'id': d['id'] ?? 0,
+      'studentName': d['studentName'] ?? d['student_name'] ?? 'Student',
+      'studentClass': d['classLevel'] ?? d['class_level'] ?? 'Class',
+      'question': d['question'] ?? '',
+      'replied': (d['status'] ?? '') == 'solved',
+      'replyText': d['replyText'] ?? d['reply_text'] ?? '',
+      'time': d['createdAt'] ?? d['created_at'] ?? 'Recently',
+      'attachmentName': d['attachmentName'] ?? d['attachment_name'] ?? '',
+      'subject': d['subject'] ?? '',
+    }).toList();
+  }
+
+  /// Build leaderboard standings from real student names
+  List<Map<String, dynamic>> _getLeaderboardNames(AppState state, int offset) {
+    final students = state.linkedStudents;
+    final trophies = ['1st', '2nd', '3rd'];
+    final levels = ['Level 5 (Complete)', 'Level 4 Finished', 'Level 3 Finished'];
+    if (students.isEmpty) {
+      return [
+        {'name': 'No students yet', 'score': '-', 'trophy': '-'},
+      ];
     }
-  ];
+    return List.generate(
+      students.length < 3 ? students.length : 3,
+      (i) {
+        final idx = (i + offset) % students.length;
+        return {
+          'name': students[idx]['name'] ?? 'Student ${idx + 1}',
+          'score': levels[i % levels.length],
+          'trophy': trophies[i],
+        };
+      },
+    );
+  }
 
   // Schedules are now managed centrally in AppState to synchronize between Admin, Teacher, and Student.
 
@@ -4117,11 +4137,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> with Wi
                   onTap: () => _showLeaderboardDetails(context, 'Quiz Arena', state),
                   child: _buildGameLeaderboardCard(
                     title: 'Quiz Arena',
-                    standings: [
-                      {'name': 'Gulshan Sharma', 'score': 'Level 5 (Complete)', 'trophy': '1st'},
-                      {'name': 'Rohan Das', 'score': 'Level 4 Finished', 'trophy': '2nd'},
-                      {'name': 'Priya Patel', 'score': 'Level 3 Finished', 'trophy': '3rd'},
-                    ],
+                    standings: _getLeaderboardNames(state, 0),
                     color: const Color(0xFFEFF6FF),
                     borderColor: const Color(0xFF2563EB),
                   ),
@@ -4131,11 +4147,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> with Wi
                   onTap: () => _showLeaderboardDetails(context, 'Cognitive Arena', state),
                   child: _buildGameLeaderboardCard(
                     title: 'Cognitive Arena',
-                    standings: [
-                      {'name': 'Gulshan Sharma', 'score': 'Level 5 (Complete)', 'trophy': '1st'},
-                      {'name': 'Anya Verma', 'score': 'Level 4 Finished', 'trophy': '2nd'},
-                      {'name': 'Kabir Gupta', 'score': 'Level 3 Finished', 'trophy': '3rd'},
-                    ],
+                    standings: _getLeaderboardNames(state, 1),
                     color: const Color(0xFFFFFBEB),
                     borderColor: const Color(0xFFFBBF24),
                   ),
@@ -4145,11 +4157,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> with Wi
                   onTap: () => _showLeaderboardDetails(context, 'Syntax Block', state),
                   child: _buildGameLeaderboardCard(
                     title: 'Syntax Block',
-                    standings: [
-                      {'name': 'Priya Patel', 'score': 'Level 4 (Complete)', 'trophy': '1st'},
-                      {'name': 'Gulshan Sharma', 'score': 'Level 3 Finished', 'trophy': '2nd'},
-                      {'name': 'Rohan Das', 'score': 'Level 2 Finished', 'trophy': '3rd'},
-                    ],
+                    standings: _getLeaderboardNames(state, 2),
                     color: const Color(0xFFF5F3FF),
                     borderColor: const Color(0xFF8B5CF6),
                   ),
@@ -4159,11 +4167,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> with Wi
                   onTap: () => _showLeaderboardDetails(context, 'Word Unscramble', state),
                   child: _buildGameLeaderboardCard(
                     title: 'Word Unscramble',
-                    standings: [
-                      {'name': 'Gulshan Sharma', 'score': 'Level 5 (Complete)', 'trophy': '1st'},
-                      {'name': 'Amit Roy', 'score': 'Level 4 Finished', 'trophy': '2nd'},
-                      {'name': 'Rohan Das', 'score': 'Level 3 Finished', 'trophy': '3rd'},
-                    ],
+                    standings: _getLeaderboardNames(state, 3),
                     color: const Color(0xFFECFDF5),
                     borderColor: const Color(0xFF10B981),
                   ),
@@ -4189,13 +4193,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> with Wi
               'level': level,
             };
           }).toList()
-        : [
-            {'name': 'Gulshan Sharma', 'score': 'Level 5 (Complete)', 'level': 5},
-            {'name': 'Rohan Das', 'score': 'Level 4 Finished', 'level': 4},
-            {'name': 'Priya Patel', 'score': 'Level 3 Finished', 'level': 3},
-            {'name': 'Anya Verma', 'score': 'Level 2 Finished', 'level': 2},
-            {'name': 'Kabir Gupta', 'score': 'Level 1 Finished', 'level': 1},
-          ];
+        : []; // No fallback — real data only
 
     standings.sort((a, b) => (b['level'] as int).compareTo(a['level'] as int));
 
@@ -4438,14 +4436,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> with Wi
               'status': status,
             };
           }).toList()
-        : [
-            {'id': 's1', 'name': 'Anya Verma',     'math': 88.0, 'science': 92.0, 'english': 78.0, 'attendance': 96.0, 'xp': 2450, 'status': 'top'},
-            {'id': 's2', 'name': 'Kabir Gupta',    'math': 76.0, 'science': 84.0, 'english': 90.0, 'attendance': 92.0, 'xp': 2310, 'status': 'good'},
-            {'id': 's3', 'name': 'Rohan Malhotra', 'math': 65.0, 'science': 70.0, 'english': 60.0, 'attendance': 85.0, 'xp': 2190, 'status': 'average'},
-            {'id': 's4', 'name': 'Diya Sen',       'math': 92.0, 'science': 88.0, 'english': 95.0, 'attendance': 98.0, 'xp': 1900, 'status': 'top'},
-            {'id': 's5', 'name': 'Ishaan Mehta',   'math': 55.0, 'science': 62.0, 'english': 58.0, 'attendance': 74.0, 'xp': 1450, 'status': 'struggling'},
-            {'id': 's6', 'name': 'Meera Iyer',     'math': 80.0, 'science': 75.0, 'english': 82.0, 'attendance': 90.0, 'xp': 2500, 'status': 'good'},
-          ];
+        : []; // No fallback demo data
 
     double mathSum = 0;
     double sciSum = 0;
@@ -5137,11 +5128,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> with Wi
   Widget _buildParentCommunicationTab(AppState state) {
     final List<Map<String, dynamic>> students = state.linkedStudents.isNotEmpty
         ? state.linkedStudents
-        : <Map<String, dynamic>>[
-            {'id': 'std_1', 'name': 'Aarav Sharma', 'class_name': 'Class 10'},
-            {'id': 'std_2', 'name': 'Rahul Sharma', 'class_name': 'Class 10'},
-            {'id': 'std_3', 'name': 'Priya Patel', 'class_name': 'Class 10'},
-          ];
+        : <Map<String, dynamic>>[]; // No demo data — show empty state
 
     if (_selectedStudentId == null && students.isNotEmpty) {
       _selectedStudentId = students.first['id'].toString();
@@ -5154,8 +5141,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> with Wi
 
     final selectedStudentName = students.firstWhere(
       (s) => s['id'].toString() == _selectedStudentId,
-      orElse: () => <String, dynamic>{'name': 'Aarav Sharma'},
-    )['name'] ?? 'Aarav Sharma';
+      orElse: () => <String, dynamic>{'name': 'Student'},
+    )['name'] ?? 'Student';
 
     final teacherSentMessages = state.teacherMessages.where((m) => m['teacherName'] != 'School Administration (Admin)').toList();
 
@@ -6128,12 +6115,12 @@ class _TeacherAttendancePortalPageState extends State<TeacherAttendancePortalPag
     final state = Provider.of<AppState>(context, listen: false);
     final students = state.linkedStudents;
     final List<Map<String, dynamic>> fallbackStudents = students.isNotEmpty ? students : [
-      {'id': 's1', 'name': 'Anya Verma'},
-      {'id': 's2', 'name': 'Kabir Gupta'},
-      {'id': 's3', 'name': 'Rohan Malhotra'},
-      {'id': 's4', 'name': 'Diya Sen'},
-      {'id': 's5', 'name': 'Ishaan Mehta'},
-      {'id': 's6', 'name': 'Meera Iyer'},
+      {'id': 's1', 'name': 'Student 1'},
+      {'id': 's2', 'name': 'Student 2'},
+      {'id': 's3', 'name': 'Student 3'},
+      {'id': 's4', 'name': 'Student 4'},
+      {'id': 's5', 'name': 'Student 5'},
+      {'id': 's6', 'name': 'Student 6'},
     ];
     // Use modulo so these arrays safely wrap around for any number of students
     final statuses = ['Present', 'Present', 'Excused', 'Present', 'Absent', 'Present'];
@@ -6188,12 +6175,12 @@ class _TeacherAttendancePortalPageState extends State<TeacherAttendancePortalPag
 
     if (allLogs.isEmpty) {
       final List<Map<String, dynamic>> fallbackStudents = students.isNotEmpty ? students : [
-        {'id': 's1', 'name': 'Anya Verma'},
-        {'id': 's2', 'name': 'Kabir Gupta'},
-        {'id': 's3', 'name': 'Rohan Malhotra'},
-        {'id': 's4', 'name': 'Diya Sen'},
-        {'id': 's5', 'name': 'Ishaan Mehta'},
-        {'id': 's6', 'name': 'Meera Iyer'},
+        {'id': 's1', 'name': 'Student 1'},
+        {'id': 's2', 'name': 'Student 2'},
+        {'id': 's3', 'name': 'Student 3'},
+        {'id': 's4', 'name': 'Student 4'},
+        {'id': 's5', 'name': 'Student 5'},
+        {'id': 's6', 'name': 'Student 6'},
       ];
 
       allLogs = [
@@ -7109,7 +7096,7 @@ class _HomeworkSubmissionsPageState extends State<HomeworkSubmissionsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          sub['studentName'] ?? 'Aarav Sharma',
+                          sub['studentName'] ?? 'Student',
                           style: GoogleFonts.fredoka(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
                         ),
                         Text(
@@ -7222,7 +7209,7 @@ class _HomeworkSubmissionsPageState extends State<HomeworkSubmissionsPage> {
                           title: isImage ? "Student Image Submission" : "Student PDF Submission",
                           filePath: filePath,
                           fileName: fileName,
-                          studentName: sub['studentName'] ?? 'Aarav Sharma',
+                          studentName: sub['studentName'] ?? 'Student',
                         ),
                       ),
                     );
@@ -7251,7 +7238,7 @@ class _HomeworkSubmissionsPageState extends State<HomeworkSubmissionsPage> {
                       builder: (_) => HomeworkFileViewerPage(
                         title: "Student Image Submission",
                         filePath: filePath,
-                        studentName: sub['studentName'] ?? 'Aarav Sharma',
+                        studentName: sub['studentName'] ?? 'Student',
                       ),
                     ),
                   );
@@ -7338,7 +7325,7 @@ class _HomeworkSubmissionsPageState extends State<HomeworkSubmissionsPage> {
                     style: GoogleFonts.fredoka(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
                   ),
                   Text(
-                    sub['studentName'] ?? 'Aarav Sharma',
+                    sub['studentName'] ?? 'Student',
                     style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
                   ),
                 ],
