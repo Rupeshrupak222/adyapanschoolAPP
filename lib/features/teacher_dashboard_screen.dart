@@ -72,7 +72,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> with Wi
   }
 
   /// Build leaderboard standings from real student names
-  List<Map<String, dynamic>> _getLeaderboardNames(AppState state, int offset) {
+  List<Map<String, String>> _getLeaderboardNames(AppState state, int offset) {
     final students = state.linkedStudents;
     final trophies = ['1st', '2nd', '3rd'];
     final levels = ['Level 5 (Complete)', 'Level 4 Finished', 'Level 3 Finished'];
