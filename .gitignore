@@ -48,5 +48,8 @@ app.*.map.json
 # The Flutter .env is safe to commit (contains only the public API URL)
 # Backend .env contains secrets and must NOT be committed
 backend/.env
+
+# Keystore properties configuration
+key.properties
 .env.local
 .env.production

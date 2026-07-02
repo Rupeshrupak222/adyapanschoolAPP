@@ -259,6 +259,21 @@ class AppState extends ChangeNotifier {
       await ApiService().clearTokens();
       await _prefs.setBool(migrationKey, true);
     }
+
+    // Force clear any old cached demo/mock data stored in SharedPreferences
+    final migrationClearKey = 'migration_clear_demo_data_v4';
+    final hasClearedDemo = _prefs.getBool(migrationClearKey) ?? false;
+    if (!hasClearedDemo) {
+      await _prefs.remove('homework_list');
+      await _prefs.remove('notes_list');
+      await _prefs.remove('attendance_logs');
+      await _prefs.remove('teacher_messages');
+      await _prefs.remove('recorded_lectures');
+      await _prefs.remove('study_schedules');
+      await _prefs.remove('teacher_feedbacks');
+      await _prefs.remove('todos');
+      await _prefs.setBool(migrationClearKey, true);
+    }
     
     // Load XP & Stats
     _xp = _prefs.getInt('xp') ?? 120;
