@@ -253,10 +253,33 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     itemBuilder: (context, index) {
                       final msg = _messages[index];
                       final isRead = msg['is_read'] == 1 || msg['is_read'] == true;
-                      final senderName = msg['sender_name'] ?? msg['sender_email'] ?? 'Unknown';
+                      final rawSenderName = msg['sender_name']?.toString() ?? msg['sender_email']?.toString() ?? 'Unknown';
                       final messageText = msg['message'] ?? '';
                       final createdAt = msg['created_at'] ?? '';
                       final id = msg['id']?.toString() ?? '';
+
+                      // Parse "Name – Role (School)" format
+                      String displayName = rawSenderName;
+                      String schoolName = '';
+                      String roleName = '';
+
+                      if (rawSenderName.contains('(') && rawSenderName.contains(')')) {
+                        try {
+                          final startIdx = rawSenderName.indexOf('(');
+                          final endIdx = rawSenderName.lastIndexOf(')');
+                          schoolName = rawSenderName.substring(startIdx + 1, endIdx).trim();
+                          displayName = rawSenderName.substring(0, startIdx).trim();
+                          if (displayName.contains('–')) {
+                            final parts = displayName.split('–');
+                            displayName = parts.first.trim();
+                            roleName = parts.length > 1 ? parts[1].trim() : '';
+                          }
+                        } catch (_) {}
+                      } else if (rawSenderName.contains('–')) {
+                        final parts = rawSenderName.split('–');
+                        displayName = parts.first.trim();
+                        roleName = parts.length > 1 ? parts[1].trim() : '';
+                      }
 
                       return Card(
                         elevation: isRead ? 0 : 2,
@@ -275,20 +298,75 @@ class _MessagesScreenState extends State<MessagesScreen> {
                               size: 20,
                             ),
                           ),
-                          title: Text(
-                            senderName,
-                            style: AdyapanTheme.outfit(
-                              fontSize: 14,
-                              fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-                            ),
+                          title: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  displayName,
+                                  style: AdyapanTheme.outfit(
+                                    fontSize: 14,
+                                    fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (roleName.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: roleName.toLowerCase().contains('teacher')
+                                        ? const Color(0xFF8B5CF6).withOpacity(0.12)
+                                        : roleName.toLowerCase().contains('admin')
+                                            ? const Color(0xFFEF4444).withOpacity(0.1)
+                                            : const Color(0xFF3B82F6).withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Text(
+                                    roleName,
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: roleName.toLowerCase().contains('teacher')
+                                          ? const Color(0xFF7C3AED)
+                                          : roleName.toLowerCase().contains('admin')
+                                              ? const Color(0xFFDC2626)
+                                              : const Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           subtitle: Padding(
                             padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              messageText,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: AdyapanTheme.outfit(fontSize: 13, color: Colors.grey.shade600),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (schoolName.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 3),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.school_outlined, size: 11, color: Colors.grey.shade500),
+                                        const SizedBox(width: 3),
+                                        Flexible(
+                                          child: Text(
+                                            schoolName,
+                                            style: AdyapanTheme.outfit(fontSize: 11, color: Colors.grey.shade500),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                Text(
+                                  messageText,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AdyapanTheme.outfit(fontSize: 13, color: Colors.grey.shade600),
+                                ),
+                              ],
                             ),
                           ),
                           trailing: Text(
@@ -314,20 +392,76 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   void _showMessageDetail(Map<String, dynamic> msg) {
+    final rawSenderName = msg['sender_name']?.toString() ?? 'Message';
+    String displayName = rawSenderName;
+    String schoolName = '';
+    String roleName = '';
+
+    if (rawSenderName.contains('(') && rawSenderName.contains(')')) {
+      try {
+        final startIdx = rawSenderName.indexOf('(');
+        final endIdx = rawSenderName.lastIndexOf(')');
+        schoolName = rawSenderName.substring(startIdx + 1, endIdx).trim();
+        displayName = rawSenderName.substring(0, startIdx).trim();
+        if (displayName.contains('–')) {
+          final parts = displayName.split('–');
+          displayName = parts.first.trim();
+          roleName = parts.length > 1 ? parts[1].trim() : '';
+        }
+      } catch (_) {}
+    } else if (rawSenderName.contains('–')) {
+      final parts = rawSenderName.split('–');
+      displayName = parts.first.trim();
+      roleName = parts.length > 1 ? parts[1].trim() : '';
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.message, color: Color(0xFF4F46E5), size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                msg['sender_name'] ?? 'Message',
-                style: AdyapanTheme.outfit(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
+            Row(
+              children: [
+                const Icon(Icons.message, color: Color(0xFF4F46E5), size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    displayName,
+                    style: AdyapanTheme.outfit(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (roleName.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B82F6).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      roleName,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF2563EB)),
+                    ),
+                  ),
+              ],
             ),
+            if (schoolName.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const SizedBox(width: 28),
+                  Icon(Icons.school_outlined, size: 12, color: Colors.grey.shade500),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      schoolName,
+                      style: AdyapanTheme.outfit(fontSize: 12, color: Colors.grey.shade500),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
         content: Column(

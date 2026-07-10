@@ -373,6 +373,9 @@ class ApiService {
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
+        if (data is Map && data['data'] != null && data['data']['messages'] != null) {
+          return List<Map<String, dynamic>>.from(data['data']['messages']);
+        }
         if (data is Map && data['messages'] != null) {
           return List<Map<String, dynamic>>.from(data['messages']);
         }
@@ -402,6 +405,9 @@ class ApiService {
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
+        if (data is Map && data['data'] != null && data['data']['messages'] != null) {
+          return List<Map<String, dynamic>>.from(data['data']['messages']);
+        }
         if (data is Map && data['messages'] != null) {
           return List<Map<String, dynamic>>.from(data['messages']);
         }
@@ -593,9 +599,14 @@ class ApiService {
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        _token = data['data']['token'];
+        final responseData = data['data'] ?? data;
+        _token = responseData['token'] ?? responseData['accessToken'];
+        _refreshToken = responseData['refreshToken'] ?? _refreshToken;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', _token!);
+        if (_refreshToken != null) {
+          await prefs.setString('refresh_token', _refreshToken!);
+        }
         return true;
       }
     } catch (e) {
