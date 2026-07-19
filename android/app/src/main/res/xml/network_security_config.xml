@@ -1,20 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Trust system CAs for all connections (TiDB Cloud uses standard SSL certs) -->
+    <!-- Only trust system CAs — do NOT trust user-installed certificates -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </base-config>
-
-    <!-- TiDB Cloud — allow SSL connection -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">tidbcloud.com</domain>
-        <domain includeSubdomains="true">alicloud.tidbcloud.com</domain>
-        <domain includeSubdomains="true">prod.alicloud.tidbcloud.com</domain>
-        <trust-anchors>
-            <certificates src="system" />
-        </trust-anchors>
-    </domain-config>
 </network-security-config>

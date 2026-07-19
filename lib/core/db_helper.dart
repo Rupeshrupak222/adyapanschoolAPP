@@ -5,8 +5,6 @@ import 'dart:typed_data';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:dbcrypt/dbcrypt.dart';
-import 'package:argon2/argon2.dart';
 
 class DbHelper {
   static final Random _random = Random.secure();
@@ -162,259 +160,25 @@ class DbHelper {
   }
 
   // Reset password — DEPRECATED plain text version kept for backward compat
+  // DISABLED: Password reset without authentication is a security vulnerability.
+  // Password reset must go through backend OTP/email verification.
   static Future<bool> resetPassword(String email, String newPassword) async {
-    return resetPasswordSecure(email, newPassword);
+    // Cannot reset password without proper identity verification
+    return false;
   }
 
-  // Reset password securely with Argon2id hashing
+  // DISABLED: Direct DB password reset removed for security.
+  // Use backend API with proper OTP verification instead.
   static Future<bool> resetPasswordSecure(String email, String newPassword) async {
-    final cleanEmail = email.toLowerCase().trim();
-    try {
-      final conn = await getConnection();
-      
-      // Check if user exists
-      final checkRes = await conn.execute(
-        'SELECT id FROM users WHERE LOWER(email) = :email;',
-        {'email': cleanEmail},
-      );
-
-      if (checkRes.rows.isEmpty) {
-        return false; // Email not registered!
-      }
-
-      // Hash the new password with Argon2id before storing
-      final hashedPassword = await _hashPasswordArgon2(newPassword);
-
-      // Update both password fields with the hash
-      await conn.execute('''
-        UPDATE users 
-        SET password = :password, password_hash = :password, updated_at = NOW()
-        WHERE LOWER(email) = :email;
-      ''', {
-        'email': cleanEmail,
-        'password': hashedPassword,
-      });
-
-      return true;
-    } catch (e) {
-      print('❌ Database password reset error: $e');
-      return false;
-    }
+    return false;
   }
 
-  /// Hash a password using Argon2id (matching the Node.js backend config)
-  /// Config: memoryCost=65536 (64MB), timeCost=3, parallelism=1, hashLength=32
-  static Future<String> _hashPasswordArgon2(String password) async {
-    // Generate a random 16-byte salt
-    final salt = Uint8List(16);
-    for (int i = 0; i < 16; i++) {
-      salt[i] = _random.nextInt(256);
-    }
-
-    final parameters = Argon2Parameters(
-      Argon2Parameters.ARGON2_id,
-      salt,
-      version: Argon2Parameters.ARGON2_VERSION_13,
-      iterations: 3,
-      memory: 65536,
-      lanes: 1,
-    );
-
-    final argon2 = Argon2BytesGenerator();
-    argon2.init(parameters);
-
-    final passwordBytes = parameters.converter.convert(password);
-    final result = Uint8List(32); // 32-byte hash
-    argon2.generateBytes(passwordBytes, result, 0, result.length);
-
-    // Encode to standard Argon2 hash string format (compatible with Node.js argon2 package)
-    final saltB64 = base64Encode(salt).replaceAll('=', '');
-    final hashB64 = base64Encode(result).replaceAll('=', '');
-    return '\$argon2id\$v=19\$m=65536,t=3,p=1\$$saltB64\$$hashB64';
-  }
-
-  // Validate credentials against TiDB Database (direct connection with hash verification)
-  static Future<Map<String, dynamic>?> loginUser(String email, String password) async {
-    final cleanEmail = email.toLowerCase().trim();
-    print('🔐 Login attempt: $cleanEmail');
-
-    // Connect directly to TiDB Cloud and verify password hash in Dart
-    try {
-      final conn = await getConnection();
-      final results = await conn.execute('''
-        SELECT id, name, email, phone, class_name, class_level, school, school_name, role, teacher_id, 
-               password, password_hash, xp, level, streak, completed_quizzes
-        FROM users
-        WHERE LOWER(email) = :email;
-      ''', {
-        'email': cleanEmail,
-      });
-
-      if (results.rows.isEmpty) {
-        print('❌ DB: No user found for $cleanEmail');
-        return null;
-      }
-
-      final row = results.rows.first.assoc();
-      final storedHash = row['password_hash'] ?? row['password'] ?? '';
-
-      // Verify password against stored hash (supports Argon2id, bcrypt, plain text)
-      final isValid = await _verifyPasswordHash(password, storedHash);
-      if (!isValid) {
-        print('❌ DB: Password mismatch for $cleanEmail');
-        return null;
-      }
-
-      print('✅ Direct DB login success for $cleanEmail');
-
-      // Log login event (non-critical)
-      try {
-        await conn.execute('''
-          INSERT INTO login_events (id, user_id, name, email, role, source, status, user_agent)
-          VALUES (:id, :userId, :name, :email, :role, :source, :status, :userAgent);
-        ''', {
-          'id': _newId('mobile_login'),
-          'userId': row['id'] ?? '',
-          'name': row['name'] ?? '',
-          'email': row['email'] ?? cleanEmail,
-          'role': row['role'] ?? 'student',
-          'source': 'mobile',
-          'status': 'success',
-          'userAgent': 'flutter',
-        });
-      } catch (e) {
-        print('⚠️ Login event insert failed (non-critical): $e');
-      }
-
-      return {
-        'id': row['id'] ?? '',
-        'name': row['name'] ?? '',
-        'email': row['email'] ?? '',
-        'phone': row['phone'] ?? '',
-        'className': row['class_name'] ?? row['class_level'] ?? '',
-        'school': row['school'] ?? row['school_name'] ?? '',
-        'role': row['role'] ?? 'student',
-        'teacher_id': row['teacher_id'] ?? '',
-        'xp': row['xp'] ?? '120',
-        'level': row['level'] ?? '1',
-        'streak': row['streak'] ?? '3',
-        'completedQuizzes': row['completed_quizzes'] ?? '4',
-      };
-    } catch (e) {
-      print('❌ Direct DB login error: $e');
-      rethrow;
-    }
-  }
-
-  /// Verify password against stored hash (supports Argon2id, bcrypt, and plain text)
-  static Future<bool> _verifyPasswordHash(String password, String storedHash) async {
-    if (storedHash.isEmpty) return false;
-
-    // Argon2id hash: $argon2id$v=19$m=65536,t=3,p=1$...
-    if (storedHash.startsWith('\$argon2')) {
-      try {
-        return await _verifyArgon2(password, storedHash);
-      } catch (e) {
-        print('⚠️ Argon2 verify error: $e');
-        return false;
-      }
-    }
-
-    // bcrypt hash: $2a$, $2b$, $2y$
-    if (RegExp(r'^\$2[aby]\$').hasMatch(storedHash)) {
-      try {
-        final bcrypt = DBCrypt();
-        return bcrypt.checkpw(password, storedHash);
-      } catch (e) {
-        print('⚠️ BCrypt verify error: $e');
-        return false;
-      }
-    }
-
-    // Plain text (legacy) — constant-time-ish comparison
-    return password == storedHash;
-  }
-
-  /// Verify Argon2id hash using the pure Dart argon2 package
-  static Future<bool> _verifyArgon2(String password, String hashString) async {
-    // Parse the Argon2id hash string: $argon2id$v=19$m=65536,t=3,p=1$<base64 salt>$<base64 hash>
-    final parts = hashString.split('\$');
-    // parts: ['', 'argon2id', 'v=19', 'm=65536,t=3,p=1', '<base64 salt>', '<base64 hash>']
-    if (parts.length < 6) return false;
-
-    // Determine argon2 type
-    final typeStr = parts[1];
-    int type;
-    if (typeStr == 'argon2id') {
-      type = Argon2Parameters.ARGON2_id;
-    } else if (typeStr == 'argon2i') {
-      type = Argon2Parameters.ARGON2_i;
-    } else if (typeStr == 'argon2d') {
-      type = Argon2Parameters.ARGON2_d;
-    } else {
-      return false;
-    }
-
-    // Parse version
-    int version = Argon2Parameters.ARGON2_VERSION_13; // default v=19 (0x13)
-    if (parts[2].startsWith('v=')) {
-      final v = int.tryParse(parts[2].substring(2));
-      if (v == 16) version = Argon2Parameters.ARGON2_VERSION_10;
-      if (v == 19) version = Argon2Parameters.ARGON2_VERSION_13;
-    }
-
-    // Parse params: m=65536,t=3,p=1
-    final paramParts = parts[3].split(',');
-    int memory = 65536;
-    int iterations = 3;
-    int parallelism = 1;
-    for (final p in paramParts) {
-      if (p.startsWith('m=')) memory = int.tryParse(p.substring(2)) ?? memory;
-      if (p.startsWith('t=')) iterations = int.tryParse(p.substring(2)) ?? iterations;
-      if (p.startsWith('p=')) parallelism = int.tryParse(p.substring(2)) ?? parallelism;
-    }
-
-    final saltBase64 = parts[4];
-    final hashBase64 = parts[5];
-
-    // Decode base64 (Argon2 uses base64 without padding)
-    final salt = base64Decode(_addBase64Padding(saltBase64));
-    final expectedHash = base64Decode(_addBase64Padding(hashBase64));
-
-    // Configure Argon2 parameters
-    final parameters = Argon2Parameters(
-      type,
-      salt,
-      version: version,
-      iterations: iterations,
-      memory: memory,
-      lanes: parallelism,
-    );
-
-    // Generate hash from password
-    final argon2 = Argon2BytesGenerator();
-    argon2.init(parameters);
-
-    final passwordBytes = parameters.converter.convert(password);
-    final result = Uint8List(expectedHash.length);
-    argon2.generateBytes(passwordBytes, result, 0, result.length);
-
-    // Constant-time comparison
-    if (result.length != expectedHash.length) return false;
-    int diff = 0;
-    for (int i = 0; i < result.length; i++) {
-      diff |= result[i] ^ expectedHash[i];
-    }
-    return diff == 0;
-  }
-
-  /// Add padding to base64 string if needed
-  static String _addBase64Padding(String base64Str) {
-    final remainder = base64Str.length % 4;
-    if (remainder == 0) return base64Str;
-    return base64Str + '=' * (4 - remainder);
-  }
-
+  // Password hashing/verification is handled server-side only.
+  // These functions are disabled for security ??? no crypto libraries in the app.
+  static Future<String> _hashPasswordArgon2(String password) async => throw UnsupportedError("Use backend API");
+  static Future<bool> _verifyPasswordHash(String password, String storedHash) async => false;
+  static Future<bool> _verifyArgon2(String password, String hashString) async => false;
+  static String _addBase64Padding(String base64Str) => base64Str;
 
 
 
