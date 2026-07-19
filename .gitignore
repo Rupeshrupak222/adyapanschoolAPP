@@ -44,7 +44,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Environment variables (contains secrets)
-.env
+# Environment variables (backend secrets only)
+# The Flutter .env is safe to commit (contains only the public API URL)
+# Backend .env contains secrets and must NOT be committed
+backend/.env
 .env.local
 .env.production

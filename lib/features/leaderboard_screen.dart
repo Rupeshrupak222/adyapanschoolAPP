@@ -23,12 +23,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   List<Map<String, dynamic>> _getLeaderboard(AppState state, int tab) {
     if (state.leaderboard.isEmpty) {
-      // Fallback templates if database is empty/still syncing
+      // No data yet — show only current user
       return [
-        {'rank': 1, 'name': 'Anya Verma', 'score': 2450, 'change': '+2'},
-        {'rank': 2, 'name': 'Kabir Gupta', 'score': 2310, 'change': '-1'},
-        {'rank': 3, 'name': 'Rohan Malhotra', 'score': 2190, 'change': '+1'},
-        {'rank': 4, 'name': state.studentName.isNotEmpty ? state.studentName : 'You', 'score': 120 + state.xp, 'isUser': true, 'change': '0'},
+        {'rank': 1, 'name': state.studentName.isNotEmpty ? state.studentName : 'You', 'score': state.xp, 'isUser': true, 'change': '0'},
       ];
     }
 

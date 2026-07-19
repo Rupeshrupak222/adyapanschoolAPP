@@ -35,6 +35,14 @@ const MODEL_TABLE = {
   principal_login_events:    'principal_login_events',
   teacher_class_sessions:    'teacher_class_sessions',
   dashboard_snapshots:       'dashboard_snapshots',
+  app_homework:              'app_homework',
+  app_homework_submissions:  'app_homework_submissions',
+  app_doubts:                'app_doubts',
+  app_live_classes:          'app_live_classes',
+  app_notes:                 'app_notes',
+  app_recorded_lectures:     'app_recorded_lectures',
+  app_teacher_messages:      'app_teacher_messages',
+  app_notices:               'app_notices',
 };
 
 // ─── Write operations that must be mirrored ──────────────────────────

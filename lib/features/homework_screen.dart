@@ -1,31 +1,143 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:confetti/confetti.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 import '../core/theme.dart';
 import '../core/app_state.dart';
 
 /// Opens a file URL (web, local, or cloud) using the OS viewer.
+/// If it's a network file, downloads it to device storage first.
 Future<void> _openAttachment(BuildContext context, String? fileUrl, String? filePath, {String? defaultFileName}) async {
   final name = defaultFileName ?? (filePath != null ? filePath.split(Platform.isWindows ? '\\' : '/').last : 'Attachment');
 
-  // Try network URL first (either fileUrl or filePath starting with http)
-  final netUrl = (fileUrl != null && fileUrl.isNotEmpty && fileUrl.startsWith('http')) 
-      ? fileUrl 
-      : ((filePath != null && filePath.isNotEmpty && filePath.startsWith('http')) ? filePath : null);
+  // Construct full URL if it's a relative path
+  String? netUrl;
+  final baseUrl = 'https://preschool-wzjj.onrender.com';
+  
+  if (fileUrl != null && fileUrl.isNotEmpty) {
+    netUrl = fileUrl.startsWith('http') ? fileUrl : '$baseUrl$fileUrl';
+  } else if (filePath != null && filePath.isNotEmpty && filePath.startsWith('http')) {
+    netUrl = filePath;
+  } else if (filePath != null && filePath.isNotEmpty && filePath.startsWith('/uploads')) {
+    netUrl = '$baseUrl$filePath';
+  }
+
+  // Handle base64 Data URL decoding directly
+  final checkUrl = fileUrl ?? filePath ?? '';
+  if (checkUrl.startsWith('data:')) {
+    try {
+      final parts = checkUrl.split(',');
+      if (parts.length > 1) {
+        final base64Data = parts.last;
+        final bytes = base64Decode(base64Data);
+        
+        final dir = Directory('/storage/emulated/0/Download');
+        final downloadsDir = dir.existsSync() ? dir : Directory('/storage/emulated/0/Documents');
+        if (!downloadsDir.existsSync()) {
+          downloadsDir.createSync(recursive: true);
+        }
+        
+        final safeName = name.replaceAll(RegExp(r'[^\w\s\-\.]'), '_');
+        final savePath = '${downloadsDir.path}/$safeName';
+        final file = File(savePath);
+        await file.writeAsBytes(bytes);
+        
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Decoded to: ${file.path}', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Open',
+              textColor: Colors.white,
+              onPressed: () async {
+                final uri = Uri.file(file.path);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ),
+        );
+        return;
+      }
+    } catch (e) {
+      debugPrint('Failed to decode base64 attachment: $e');
+    }
+  }
 
   if (netUrl != null) {
+    // Try to download the file to device storage
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⬇️ Downloading $name...', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          backgroundColor: const Color(0xFF2563EB),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      final response = await http.get(Uri.parse(netUrl)).timeout(const Duration(seconds: 30));
+      
+      if (response.statusCode == 200) {
+        // Save to device Downloads directory
+        final dir = Directory('/storage/emulated/0/Download');
+        final downloadsDir = dir.existsSync() ? dir : Directory('/storage/emulated/0/Documents');
+        
+        if (!downloadsDir.existsSync()) {
+          downloadsDir.createSync(recursive: true);
+        }
+        
+        final safeName = name.replaceAll(RegExp(r'[^\w\s\-\.]'), '_');
+        final savePath = '${downloadsDir.path}/$safeName';
+        final file = File(savePath);
+        await file.writeAsBytes(response.bodyBytes);
+        
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Downloaded to: ${file.path}', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Open',
+              textColor: Colors.white,
+              onPressed: () async {
+                final uri = Uri.file(file.path);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ),
+        );
+        return;
+      }
+    } catch (e) {
+      debugPrint('Download failed: $e');
+    }
+
+    // Fallback: open in browser
     final uri = Uri.tryParse(netUrl);
     if (uri != null && await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
       return;
     }
   }
+
   // Fallback: try local file path
-  if (filePath != null && filePath.isNotEmpty && !filePath.startsWith('http')) {
+  if (filePath != null && filePath.isNotEmpty && !filePath.startsWith('http') && !filePath.startsWith('/uploads')) {
     final file = File(filePath);
     if (file.existsSync()) {
       final uri = Uri.file(filePath);
@@ -36,8 +148,10 @@ Future<void> _openAttachment(BuildContext context, String? fileUrl, String? file
     }
   }
 
-  // Open beautiful In-App Viewer as robust fallback!
-  _showInAppAttachmentViewer(context, name, filePath, fileUrl);
+  // Open In-App Viewer as fallback
+  if (context.mounted) {
+    _showInAppAttachmentViewer(context, name, filePath, netUrl ?? fileUrl);
+  }
 }
 
 void _showInAppAttachmentViewer(BuildContext context, String fileName, String? filePath, String? fileUrl) {
@@ -936,15 +1050,15 @@ class _HomeworkScreenState extends State<HomeworkScreen> with SingleTickerProvid
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF59E0B),
+                                    color: const Color(0xFF2563EB),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(Icons.open_in_new_rounded, size: 12, color: Colors.white),
+                                      const Icon(Icons.download_rounded, size: 12, color: Colors.white),
                                       const SizedBox(width: 4),
-                                      Text('View', style: GoogleFonts.fredoka(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                                      Text('Download', style: GoogleFonts.fredoka(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
                                     ],
                                   ),
                                 ),

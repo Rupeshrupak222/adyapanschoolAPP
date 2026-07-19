@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -426,14 +428,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       ],
                                     ),
                                     child: ClipOval(
-                                      child: state.profileImagePath.isNotEmpty
-                                          ? Image.file(
-                                              File(state.profileImagePath),
+                                      child: state.profileImagePath.isNotEmpty && state.profileImagePath.startsWith('http')
+                                          ? Image.network(
+                                              state.profileImagePath,
                                               fit: BoxFit.cover,
                                               width: 46,
                                               height: 46,
+                                              errorBuilder: (_, __, ___) => Container(
+                                                width: 46, height: 46,
+                                                alignment: Alignment.center,
+                                                color: const Color(0xFFFBBF24),
+                                                child: Text(state.studentName.isNotEmpty ? state.studentName[0].toUpperCase() : 'S', style: GoogleFonts.fredoka(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                                              ),
                                             )
-                                          : Container(
+                                          : state.profileImagePath.isNotEmpty && !state.profileImagePath.startsWith('http') && File(state.profileImagePath).existsSync()
+                                              ? Image.file(File(state.profileImagePath), fit: BoxFit.cover, width: 46, height: 46)
+                                              : Container(
                                               decoration: const BoxDecoration(
                                                 gradient: LinearGradient(
                                                   colors: [Color(0xFFFBBF24), Color(0xFFEA580C)], // Gold-to-Orange
@@ -494,6 +504,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
+                                      if (state.studentClass.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 2.0),
+                                          child: Text(
+                                            state.studentClass,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 11,
+                                              color: const Color(0xFF1E3A8A).withOpacity(0.8),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
                                     ],
                                   ),
                                 ),
@@ -538,89 +560,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.school_rounded, color: Color(0xFF1E3A8A), size: 16),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Active Class:',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: const Color(0xFF1E3A8A).withOpacity(0.8),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Container(
-                                  height: 32,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.85),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFF1E3A8A).withOpacity(0.15)),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFF1E3A8A).withOpacity(0.04),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      )
-                                    ],
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: state.studentClass,
-                                      icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF1E3A8A), size: 20),
-                                      style: GoogleFonts.fredoka(
-                                        fontSize: 12,
-                                        color: const Color(0xFF1E3A8A),
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      onChanged: (String? newValue) {
-                                        if (newValue != null) {
-                                          state.updateProfile(
-                                            name: state.studentName,
-                                            email: state.studentEmail,
-                                            phone: state.studentPhone,
-                                            className: newValue,
-                                            school: state.studentSchool,
-                                            imagePath: state.profileImagePath.isNotEmpty ? state.profileImagePath : null,
-                                          );
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                '🎉 Content switched to $newValue successfully!',
-                                                style: GoogleFonts.fredoka(color: Colors.white, fontSize: 13),
-                                              ),
-                                              backgroundColor: const Color(0xFF10B981),
-                                              behavior: SnackBarBehavior.floating,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                            ),
-                                          );
-                                        }
-                                      },
-                                      items: <String>[
-                                        'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
-                                        'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10',
-                                        'Class 11', 'Class 12'
-                                      ].map<DropdownMenuItem<String>>((String value) {
-                                        return DropdownMenuItem<String>(
-                                          value: value,
-                                          child: Text(value),
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
+
 
                           // Header Image Banner
                           Expanded(
@@ -711,7 +651,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _buildStatsCol('${state.notesList.length + state.completedQuizzesCount + 12}', state.translate('LESSONS')),
+                        _buildStatsCol('${state.notesList.length + state.completedQuizzesCount}', state.translate('LESSONS')),
                         Container(width: 1.5, height: 28, color: const Color(0xFFEFF6FF)),
                         _buildStatsCol('${state.homeworkList.where((h) => h['submitted'] == false).length}', state.translate('QUESTS')),
                         Container(width: 1.5, height: 28, color: const Color(0xFFEFF6FF)),
@@ -1397,7 +1337,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                      ),
                      child: Column(
                         children: [
-                          _buildLeaderboardRow(1, 'Priya Sharma', '2,840 XP', true),
+                          _buildLeaderboardRow(1, state.studentName.isNotEmpty ? state.studentName : 'You', '${state.xp} XP', true),
                           const Divider(height: 16, color: Color(0xFFFDE68A)),
                           _buildLeaderboardRow(2, 'Arjun Mehta', '2,610 XP', false),
                           const Divider(height: 16, color: Color(0xFFFDE68A)),

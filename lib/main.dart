@@ -14,8 +14,13 @@ void main() async {
   // Ensure Flutter engine bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables from .env file
-  await dotenv.load(fileName: ".env");
+  // Load environment variables from .env file (non-fatal if missing)
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('⚠️ .env file not found or failed to load: $e');
+    // App will use default API_BASE_URL from ApiService
+  }
 
   // Initialize API service (load saved auth token)
   await ApiBridge.init();

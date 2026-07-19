@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/theme.dart';
 import '../core/app_state.dart';
+import '../core/api_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -21,6 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _schoolController;
   late String _selectedClass;
   String _profileImagePath = '';
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -191,39 +194,92 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _handleSaveProfile() {
+  void _handleSaveProfile() async {
+    if (_isSaving) return;
     if (_formKey.currentState!.validate()) {
-      final state = Provider.of<AppState>(context, listen: false);
-      
-      // Save details to state
-      state.updateProfile(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        phone: _phoneController.text.trim(),
-        className: _selectedClass,
-        school: _schoolController.text.trim(),
-        imagePath: _profileImagePath,
-      );
+      setState(() {
+        _isSaving = true;
+      });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Text('🎉', style: TextStyle(fontSize: 20)),
-              const SizedBox(width: 8),
-              Text(
-                'Profile updated successfully! (+30 XP)',
+      try {
+        final state = Provider.of<AppState>(context, listen: false);
+        
+        // Upload avatar to server if changed
+        if (_profileImagePath.isNotEmpty && !_profileImagePath.startsWith('http') && !_profileImagePath.startsWith('data:')) {
+          final api = ApiService();
+          final url = await api.uploadFile(_profileImagePath);
+          if (url != null) {
+            await api.updateAvatar(url);
+            // Save server URL as the image path
+            _profileImagePath = '${api.baseUrl}$url';
+          }
+        }
+
+        // Save details to state and backend
+        final success = await state.updateProfile(
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          phone: _phoneController.text.trim(),
+          className: _selectedClass,
+          school: _schoolController.text.trim(),
+          imagePath: _profileImagePath,
+        );
+
+        if (!mounted) return;
+
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Text('🎉', style: TextStyle(fontSize: 20)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Profile updated successfully! (+30 XP)',
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              backgroundColor: AdyapanTheme.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '⚠️ Failed to update profile details.',
                 style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
               ),
-            ],
-          ),
-          backgroundColor: AdyapanTheme.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-
-      Navigator.pop(context);
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '⚠️ Error saving profile: $e',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSaving = false;
+          });
+        }
+      }
     }
   }
 
@@ -231,20 +287,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final state = Provider.of<AppState>(context);
 
-    // Dynamically update text controllers from fetched database profile values
-    if (_nameController.text != state.studentName) {
+    // Dynamically update text controllers from fetched database profile values only if they are currently empty
+    if (_nameController.text.isEmpty && state.studentName.isNotEmpty) {
       _nameController.text = state.studentName;
     }
-    if (_emailController.text != state.studentEmail) {
+    if (_emailController.text.isEmpty && state.studentEmail.isNotEmpty) {
       _emailController.text = state.studentEmail;
     }
-    if (_phoneController.text != state.studentPhone) {
+    if (_phoneController.text.isEmpty && state.studentPhone.isNotEmpty) {
       _phoneController.text = state.studentPhone;
     }
-    if (_schoolController.text != state.studentSchool) {
+    if (_schoolController.text.isEmpty && state.studentSchool.isNotEmpty) {
       _schoolController.text = state.studentSchool;
     }
-    if (_selectedClass != state.studentClass) {
+    if ((_selectedClass.isEmpty || _selectedClass == 'Class 1') && state.studentClass.isNotEmpty) {
       _selectedClass = state.studentClass;
     }
 
@@ -280,10 +336,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.check_rounded, color: AdyapanTheme.blueAccent, size: 26),
-            onPressed: _handleSaveProfile,
-          ),
+          _isSaving
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AdyapanTheme.blueAccent,
+                      ),
+                    ),
+                  ),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.check_rounded, color: AdyapanTheme.blueAccent, size: 26),
+                  onPressed: _handleSaveProfile,
+                ),
           const SizedBox(width: 6),
         ],
       ),
@@ -329,14 +399,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                         child: ClipOval(
-                          child: _profileImagePath.isNotEmpty
-                              ? Image.file(
-                                  File(_profileImagePath),
+                          child: _profileImagePath.isNotEmpty && _profileImagePath.startsWith('http')
+                              ? Image.network(
+                                  _profileImagePath,
                                   fit: BoxFit.cover,
                                   width: 102,
                                   height: 102,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 102, height: 102,
+                                    alignment: Alignment.center,
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFEA580C)]),
+                                    ),
+                                    child: Text(initials, style: GoogleFonts.fredoka(fontSize: 38, fontWeight: FontWeight.bold, color: Colors.white)),
+                                  ),
                                 )
-                              : Container(
+                              : _profileImagePath.isNotEmpty && !_profileImagePath.startsWith('http') && File(_profileImagePath).existsSync()
+                                  ? Image.file(File(_profileImagePath), fit: BoxFit.cover, width: 102, height: 102)
+                                  : Container(
                                   decoration: const BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [Color(0xFFFBBF24), Color(0xFFEA580C)],
@@ -478,8 +558,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildInputLabel('Full Name'),
                     _buildTextFormField(
                       controller: _nameController,
-                      hint: 'Aarav Sharma',
+                      hint: 'Your full name',
                       icon: Icons.person_rounded,
+                      readOnly: true,
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Please enter your name';
@@ -493,9 +574,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildInputLabel('Email Address'),
                     _buildTextFormField(
                       controller: _emailController,
-                      hint: 'aarav.sharma@school.com',
+                      hint: 'your.email@school.com',
                       icon: Icons.email_rounded,
                       keyboardType: TextInputType.emailAddress,
+                      readOnly: true,
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Please enter your email';
@@ -546,19 +628,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   child: DropdownButton<String>(
                                     value: _selectedClass,
                                     isExpanded: true,
-                                    icon: const Icon(Icons.arrow_drop_down_rounded, color: AdyapanTheme.blueAccent, size: 24),
+                                    icon: const Icon(Icons.arrow_drop_down_rounded, color: AdyapanTheme.textMuted, size: 24),
                                     style: GoogleFonts.outfit(
                                       fontSize: 14,
-                                      color: AdyapanTheme.textMain,
+                                      color: const Color(0xFF64748B),
                                       fontWeight: FontWeight.bold,
                                     ),
-                                    onChanged: (String? newValue) {
-                                      if (newValue != null) {
-                                        setState(() {
-                                          _selectedClass = newValue;
-                                        });
-                                      }
-                                    },
+                                    onChanged: null,
                                     items: (() {
                                       final list = <String>[
                                         'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
@@ -592,6 +668,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 controller: _schoolController,
                                 hint: 'Adyapan Public School',
                                 icon: Icons.school_rounded,
+                                readOnly: true,
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) {
                                     return 'Please enter your school name';
@@ -628,14 +705,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: Text(
-                          'Save Profile',
-                          style: GoogleFonts.fredoka(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                'Save Profile',
+                                style: GoogleFonts.fredoka(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -669,17 +755,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    bool readOnly = false,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9), // Slate gray background for premium read-only style
+        color: readOnly ? const Color(0xFFF1F5F9) : Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
       child: TextFormField(
         controller: controller,
         keyboardType: keyboardType,
         validator: validator,
-        readOnly: true, // Completely read-only
+        readOnly: readOnly,
         onChanged: (text) {
           // Trigger redraw of header name/initials
           if (controller == _nameController) {
@@ -688,7 +775,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         },
         style: GoogleFonts.outfit(
           fontSize: 14,
-          color: const Color(0xFF64748B), // Slate gray read-only font color
+          color: readOnly ? const Color(0xFF64748B) : const Color(0xFF0F172A),
           fontWeight: FontWeight.bold,
         ),
         decoration: InputDecoration(

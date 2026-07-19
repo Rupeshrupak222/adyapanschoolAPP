@@ -355,6 +355,120 @@ class ApiService {
     return res != null;
   }
 
+  // ─── MESSAGING (Admin ↔ Principal ↔ Teacher ↔ Student) ───────────
+
+  /// Fetch messages for the currently logged-in user
+  Future<List<Map<String, dynamic>>> fetchMessages() async {
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/v1/messages'),
+        headers: _headers,
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 401) {
+        final refreshed = await _refreshAccessToken();
+        if (refreshed) return fetchMessages();
+        return [];
+      }
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data is Map && data['data'] != null && data['data']['messages'] != null) {
+          return List<Map<String, dynamic>>.from(data['data']['messages']);
+        }
+        if (data is Map && data['messages'] != null) {
+          return List<Map<String, dynamic>>.from(data['messages']);
+        }
+        if (data is List) {
+          return List<Map<String, dynamic>>.from(data);
+        }
+      }
+    } catch (e) {
+      print('❌ fetchMessages error: $e');
+    }
+    return [];
+  }
+
+  /// Fetch messages for a specific student (by email)
+  Future<List<Map<String, dynamic>>> fetchStudentMessages(String email) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/v1/messages/student?email=${Uri.encodeComponent(email)}'),
+        headers: _headers,
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 401) {
+        final refreshed = await _refreshAccessToken();
+        if (refreshed) return fetchStudentMessages(email);
+        return [];
+      }
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data is Map && data['data'] != null && data['data']['messages'] != null) {
+          return List<Map<String, dynamic>>.from(data['data']['messages']);
+        }
+        if (data is Map && data['messages'] != null) {
+          return List<Map<String, dynamic>>.from(data['messages']);
+        }
+        if (data is List) {
+          return List<Map<String, dynamic>>.from(data);
+        }
+      }
+    } catch (e) {
+      print('❌ fetchStudentMessages error: $e');
+    }
+    return [];
+  }
+
+  /// Send a message (teacher → admin/principal/student, principal → admin/teacher)
+  Future<bool> sendMessage({
+    required String recipientEmail,
+    required String recipientRole,
+    required String message,
+    String? senderName,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/v1/messages'),
+        headers: _headers,
+        body: jsonEncode({
+          'recipient_email': recipientEmail,
+          'recipient_role': recipientRole,
+          'message': message,
+          'sender_name': senderName,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 401) {
+        final refreshed = await _refreshAccessToken();
+        if (refreshed) {
+          return sendMessage(
+            recipientEmail: recipientEmail,
+            recipientRole: recipientRole,
+            message: message,
+            senderName: senderName,
+          );
+        }
+        return false;
+      }
+
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (e) {
+      print('❌ sendMessage error: $e');
+      return false;
+    }
+  }
+
+  /// Mark a message as read
+  Future<void> markMessageRead(String messageId) async {
+    try {
+      await _put('/api/v1/messages/$messageId/read', {});
+    } catch (e) {
+      print('❌ markMessageRead error: $e');
+    }
+  }
+
   // ─── PRIVATE HELPERS ──────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> _get(String path) async {
@@ -485,9 +599,14 @@ class ApiService {
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        _token = data['data']['token'];
+        final responseData = data['data'] ?? data;
+        _token = responseData['token'] ?? responseData['accessToken'];
+        _refreshToken = responseData['refreshToken'] ?? _refreshToken;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', _token!);
+        if (_refreshToken != null) {
+          await prefs.setString('refresh_token', _refreshToken!);
+        }
         return true;
       }
     } catch (e) {
@@ -497,6 +616,45 @@ class ApiService {
     // Refresh failed — force logout
     await clearTokens();
     return false;
+  }
+
+  /// Upload a file (avatar image) to the server
+  /// Returns the file URL on success, null on failure
+  Future<String?> uploadFile(String filePath) async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/v1/upload');
+      final request = http.MultipartRequest('POST', uri);
+      request.headers.addAll(_headers);
+      request.files.add(await http.MultipartFile.fromPath('file', filePath));
+      
+      final streamedRes = await request.send().timeout(const Duration(seconds: 60));
+      final res = await http.Response.fromStream(streamedRes);
+      
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        final data = jsonDecode(res.body);
+        if (data['file'] != null && data['file']['url'] != null) {
+          return data['file']['url'] as String;
+        }
+      }
+    } catch (e) {
+      print('❌ Upload file error: $e');
+    }
+    return null;
+  }
+
+  /// Update student avatar URL on the server
+  Future<bool> updateAvatar(String avatarUrl) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/v1/profile/avatar'),
+        headers: _headers,
+        body: jsonEncode({'avatarUrl': avatarUrl}),
+      ).timeout(const Duration(seconds: 10));
+      return res.statusCode == 200;
+    } catch (e) {
+      print('❌ Update avatar error: $e');
+      return false;
+    }
   }
 }
 

@@ -14,6 +14,7 @@ import 'parent_screen.dart';
 import 'login_screen.dart';
 import 'profile_screen.dart';
 import 'feedback_hub_screen.dart';
+import 'messages_screen.dart';
 import '../core/theme.dart';
 import '../core/app_state.dart';
 
@@ -24,7 +25,7 @@ class AppLayout extends StatefulWidget {
   State<AppLayout> createState() => _AppLayoutState();
 }
 
-class _AppLayoutState extends State<AppLayout> {
+class _AppLayoutState extends State<AppLayout> with WidgetsBindingObserver {
   bool _shownLiveClassDialog = false;
   final List<Widget> _screens = const [
     DashboardScreen(),
@@ -33,6 +34,29 @@ class _AppLayoutState extends State<AppLayout> {
     ArcadeScreen(),
     FocusScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Re-fetch data when app comes back to foreground
+      final appState = Provider.of<AppState>(context, listen: false);
+      if (appState.isLoggedIn && appState.sessionVerified) {
+        appState.refreshDataOnResume();
+      }
+    }
+  }
 
   void _showQuickAddTaskDialog(BuildContext context) {
     final state = Provider.of<AppState>(context, listen: false);
@@ -107,8 +131,10 @@ class _AppLayoutState extends State<AppLayout> {
 
   void _showChatbotDialog(BuildContext context) {
     final messageController = TextEditingController();
+    final studentName = Provider.of<AppState>(context, listen: false).studentName;
+    final firstName = studentName.isNotEmpty ? studentName.split(' ').first : 'Student';
     final List<Map<String, dynamic>> initialMessages = [
-      {'sender': 'bot', 'text': 'Hello Aarav! I am Adyapan AI Assistant. How can I help you study today?'},
+      {'sender': 'bot', 'text': 'Hello $firstName! I am Adyapan AI Assistant. How can I help you study today?'},
     ];
 
     showDialog(
@@ -240,7 +266,7 @@ class _AppLayoutState extends State<AppLayout> {
                                       } else if (text.toLowerCase().contains('xp') || text.toLowerCase().contains('level')) {
                                         botReply = "You can earn XP by completing focus sessions, homework, and roadmaps!";
                                       } else if (text.toLowerCase().contains('hello') || text.toLowerCase().contains('hi')) {
-                                        botReply = "Hello Aarav! How are you doing today? Ready to learn something new?";
+                                        botReply = "Hello! How are you doing today? Ready to learn something new?";
                                       }
                                       setDialogState(() {
                                         messages.add({'sender': 'bot', 'text': botReply});
@@ -269,7 +295,7 @@ class _AppLayoutState extends State<AppLayout> {
                                   } else if (text.toLowerCase().contains('xp') || text.toLowerCase().contains('level')) {
                                     botReply = "You can earn XP by completing focus sessions, homework, and roadmaps!";
                                   } else if (text.toLowerCase().contains('hello') || text.toLowerCase().contains('hi')) {
-                                    botReply = "Hello Aarav! How are you doing today? Ready to learn something new?";
+                                    botReply = "Hello! How are you doing today? Ready to learn something new?";
                                   }
                                   setDialogState(() {
                                     messages.add({'sender': 'bot', 'text': botReply});
@@ -1055,6 +1081,18 @@ class _AppLayoutState extends State<AppLayout> {
                         onTap: () {
                           Navigator.pop(context);
                           state.setTab(0);
+                        },
+                      ),
+                      _buildDrawerItem(
+                        icon: Icons.message_outlined,
+                        title: state.translate('Messages'),
+                        iconColor: const Color(0xFF4F46E5),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const MessagesScreen()),
+                          );
                         },
                       ),
                       _buildDrawerItem(

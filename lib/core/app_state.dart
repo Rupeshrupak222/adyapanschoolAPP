@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 import 'db_helper.dart';
 import 'api_service.dart';
 import 'package:flutter/material.dart';
@@ -258,6 +259,21 @@ class AppState extends ChangeNotifier {
       await ApiService().clearTokens();
       await _prefs.setBool(migrationKey, true);
     }
+
+    // Force clear any old cached demo/mock data stored in SharedPreferences
+    final migrationClearKey = 'migration_clear_demo_data_v4';
+    final hasClearedDemo = _prefs.getBool(migrationClearKey) ?? false;
+    if (!hasClearedDemo) {
+      await _prefs.remove('homework_list');
+      await _prefs.remove('notes_list');
+      await _prefs.remove('attendance_logs');
+      await _prefs.remove('teacher_messages');
+      await _prefs.remove('recorded_lectures');
+      await _prefs.remove('study_schedules');
+      await _prefs.remove('teacher_feedbacks');
+      await _prefs.remove('todos');
+      await _prefs.setBool(migrationClearKey, true);
+    }
     
     // Load XP & Stats
     _xp = _prefs.getInt('xp') ?? 120;
@@ -270,12 +286,7 @@ class AppState extends ChangeNotifier {
     if (todosJson != null) {
       _todos = List<Map<String, dynamic>>.from(jsonDecode(todosJson));
     } else {
-      // Default initial tasks
-      _todos = [
-        {'id': 1, 'title': 'Solve 5 Algebra Quizzes', 'tag': 'Math', 'completed': false},
-        {'id': 2, 'title': 'Complete Atomic Shell Game', 'tag': 'Science', 'completed': true},
-        {'id': 3, 'title': '25 Mins Focus Session', 'tag': 'Focus', 'completed': false},
-      ];
+      _todos = [];
       _saveTodos();
     }
 
@@ -308,6 +319,8 @@ class AppState extends ChangeNotifier {
     _studentClass = _prefs.getString('student_class') ?? '';
     _studentSchool = _prefs.getString('student_school') ?? '';
     _profileImagePath = _prefs.getString('profile_image_path') ?? '';
+    // If marker, clear it — will be fetched fresh from DB during sync
+    if (_profileImagePath == 'HAS_DB_AVATAR') _profileImagePath = '';
     _completedQuizzesCount = _prefs.getInt('completed_quizzes_count') ?? 4;
 
     // Load Auth Database & Session
@@ -377,26 +390,8 @@ class AppState extends ChangeNotifier {
     if (recordedJson != null) {
       _recordedLectures = List<Map<String, dynamic>>.from(jsonDecode(recordedJson));
     } else {
-      _recordedLectures = [
-        {
-          'title': 'BODMAS Foundations & Algebra',
-          'duration': 'Recorded • 45 mins',
-          'teacher': 'Mrs. Sharma',
-          'emoji': '📐',
-        },
-        {
-          'title': 'Solar System Orbit & Velocities',
-          'duration': 'Recorded • 50 mins',
-          'teacher': 'Mr. Verma',
-          'emoji': '⚛️',
-        },
-        {
-          'title': 'Active and Passive Voice Rules',
-          'duration': 'Recorded • 40 mins',
-          'teacher': 'Miss Anjali',
-          'emoji': '📖',
-        },
-      ];
+      _recordedLectures = [];
+      _recordedLectures = []; // No demo data — fetch real ones from DB
       _saveRecordedLectures();
     }
 
@@ -405,38 +400,8 @@ class AppState extends ChangeNotifier {
     if (messagesJson != null) {
       _teacherMessages = List<Map<String, dynamic>>.from(jsonDecode(messagesJson));
     } else {
-      _teacherMessages = [
-        {
-          'id': 'msg_01',
-          'studentName': 'Aarav Sharma',
-          'teacherName': 'Mrs. Aarushi Sharma (Maths HOD)',
-          'message': 'Dear Parents, Aarav has shown great performance in BODMAS balancing, but we have scheduled a Parents-Teacher Meeting (PTM) for this Friday at 3:00 PM to discuss the upcoming calculus roadmap. Please accept/confirm if you will be attending.',
-          'category': 'Meeting Request',
-          'isRead': false,
-          'date': 'Today',
-          'meetingResponse': '',
-        },
-        {
-          'id': 'msg_02',
-          'studentName': 'Aarav Sharma',
-          'teacherName': 'Mr. Ramesh Verma (Science Head)',
-          'message': 'Weekly Alert: Aarav completed the Physics Orbitals modules successfully! He gained +80 XP. However, his daily screen limit on study games should be regulated to 90 mins to maintain balanced health. Focus shield status: Optimal.',
-          'category': 'Syllabus Alert',
-          'isRead': true,
-          'date': 'Yesterday',
-          'meetingResponse': '',
-        },
-        {
-          'id': 'msg_03',
-          'studentName': 'Aarav Sharma',
-          'teacherName': 'Adyapan Smart System',
-          'message': 'System Notice: Focus Zen Master Rank badge has been unlocked for Aarav Sharma! Daily average study efficiency is currently at 78% which is outstanding.',
-          'category': 'Notice',
-          'isRead': true,
-          'date': '2 days ago',
-          'meetingResponse': '',
-        },
-      ];
+      _teacherMessages = [];
+      _teacherMessages = []; // No demo messages — fetch real ones from DB
       _saveTeacherMessages();
     }
 
@@ -454,22 +419,7 @@ class AppState extends ChangeNotifier {
     if (schedulesJson != null) {
       _studySchedules = List<Map<String, dynamic>>.from(jsonDecode(schedulesJson));
     } else {
-      _studySchedules = [
-        {
-          'id': 'sched_1',
-          'title': 'Evening Homework Focus',
-          'start': '17:00',
-          'end': '19:00',
-          'isActive': true,
-        },
-        {
-          'id': 'sched_2',
-          'title': 'Morning Revision Lock',
-          'start': '08:00',
-          'end': '09:00',
-          'isActive': false,
-        }
-      ];
+      _studySchedules = [];
       _saveStudySchedules();
     }
 
@@ -487,17 +437,8 @@ class AppState extends ChangeNotifier {
     if (feedbacksJson != null) {
       _teacherFeedbacks = List<Map<String, dynamic>>.from(jsonDecode(feedbacksJson));
     } else {
-      _teacherFeedbacks = [
-        {
-          'teacherName': 'Mrs. Sharma',
-          'subjectName': 'Mathematics',
-          'lectureTitle': 'Classroom Session',
-          'rating': 5.0,
-          'tags': ['Clear Explanations', 'Fun Activities'],
-          'comments': 'Great class! Loved the puzzle.',
-          'timestamp': DateTime.now().toIso8601String(),
-        }
-      ];
+      _teacherFeedbacks = [];
+      _teacherFeedbacks = []; // No demo data
       _saveTeacherFeedbacks();
     }
 
@@ -658,14 +599,14 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateProfile({
+  Future<bool> updateProfile({
     required String name,
     required String email,
     required String phone,
     required String className,
     required String school,
     String? imagePath,
-  }) {
+  }) async {
     _studentName = name;
     _studentEmail = email;
     _studentPhone = phone;
@@ -685,6 +626,49 @@ class AppState extends ChangeNotifier {
     }
     
     notifyListeners();
+
+    bool success = false;
+    
+    // 1. Update via Node.js API (updates dual databases)
+    try {
+      final api = ApiService();
+      final response = await api.updateProfile({
+        'name': name,
+        'phone': phone,
+        'class_name': className,
+        'class_level': className,
+        'school_name': school,
+      });
+      if (response != null && response['success'] == true) {
+        success = true;
+        print('✅ API profile update successful');
+      }
+    } catch (e) {
+      print('⚠️ API profile update failed: $e');
+    }
+
+    // 2. Fallback/Mirror: Update directly in TiDB database
+    try {
+      final conn = await DbHelper.getConnection();
+      await conn.execute('''
+        UPDATE users 
+        SET name = :name, phone = :phone, class_name = :className, class_level = :className, 
+            school = :school, school_name = :school, updated_at = NOW()
+        WHERE LOWER(email) = :email;
+      ''', {
+        'name': name,
+        'phone': phone,
+        'className': className,
+        'school': school,
+        'email': email.toLowerCase().trim(),
+      });
+      success = true; // If direct DB succeeded, count as success
+      print('✅ Direct DB profile update successful');
+    } catch (e) {
+      print('⚠️ Direct DB profile update failed: $e');
+    }
+
+    return success;
   }
 
   void updateProfileImage(String path) {
@@ -1026,8 +1010,27 @@ class AppState extends ChangeNotifier {
     if (index == -1 || _homeworkList[index]['submitted'] == true) return false;
     
     String? finalPath = filePath;
-    if (filePath != null && filePath.isNotEmpty && !filePath.startsWith('http')) {
-      finalPath = await DbHelper.uploadFile(filePath);
+    if (filePath != null && filePath.isNotEmpty && !filePath.startsWith('http') && !filePath.startsWith('data:')) {
+      try {
+        final file = File(filePath);
+        if (file.existsSync()) {
+          final bytes = await file.readAsBytes();
+          final base64String = base64Encode(bytes);
+          final ext = filePath.split('.').last.toLowerCase();
+          String mimeType = 'application/octet-stream';
+          if (ext == 'jpg' || ext == 'jpeg') {
+            mimeType = 'image/jpeg';
+          } else if (ext == 'png') {
+            mimeType = 'image/png';
+          } else if (ext == 'pdf') {
+            mimeType = 'application/pdf';
+          }
+          finalPath = 'data:$mimeType;base64,$base64String';
+        }
+      } catch (e) {
+        print('❌ Failed to convert file to base64: $e');
+        finalPath = await DbHelper.uploadFile(filePath);
+      }
     }
 
     final now = DateTime.now();
@@ -1553,6 +1556,13 @@ class AppState extends ChangeNotifier {
         _studentClass = row['class_name'] ?? row['class_level'] ?? _studentClass;
         _studentSchool = row['school'] ?? row['school_name'] ?? _studentSchool;
 
+        // Set avatar URL via API endpoint (works for both web-uploaded and app-uploaded avatars)
+        // The API at /api/avatar/email handles base64 conversion server-side
+        if (_profileImagePath.isEmpty) {
+          _profileImagePath = 'https://preschool-tau.vercel.app/api/avatar?email=${Uri.encodeComponent(email)}';
+          _prefs.setString('profile_image_path', _profileImagePath);
+        }
+
         _xp = row['xp'] != null ? int.tryParse(row['xp'].toString()) ?? _xp : _xp;
         _level = row['level'] != null ? int.tryParse(row['level'].toString()) ?? _level : _level;
         _streak = row['streak'] != null ? int.tryParse(row['streak'].toString()) ?? _streak : _streak;
@@ -1610,6 +1620,40 @@ class AppState extends ChangeNotifier {
         });
       }
 
+      // 1b. Also fetch from teacher_homework (website-assigned homework)
+      try {
+        final webHwResults = await conn.execute(
+          'SELECT h.id, h.title, h.subject, h.description, h.due_date, h.priority, h.file_name, h.file_size, h.url, t.teacher_name FROM teacher_homework h LEFT JOIN teachers t ON t.id = h.teacher_id WHERE h.status = :status ORDER BY h.created_at DESC LIMIT 50;',
+          {'status': 'active'},
+        );
+        for (final row in webHwResults.rows) {
+          final assoc = row.assoc();
+          final baseUrl = 'https://preschool-wzjj.onrender.com';
+          final fileUrl = assoc['url'] ?? '';
+          dbHomework.add({
+            'id': assoc['id'].hashCode,
+            'title': assoc['title'] ?? '',
+            'subject': assoc['subject'] ?? '',
+            'description': assoc['description'] ?? '',
+            'dueDate': assoc['due_date'] ?? '',
+            'priority': assoc['priority'] ?? 'Normal',
+            'submitted': false,
+            'submittedAt': null,
+            'addedBy': assoc['teacher_name'] ?? 'Teacher',
+            'fileName': '',
+            'filePath': '',
+            'studentComment': '',
+            'grade': 'Pending Grade',
+            'teacherFeedback': '',
+            'teacherFileName': assoc['file_name'] ?? '',
+            'teacherFilePath': '',
+            'teacherFileUrl': fileUrl.startsWith('http') ? fileUrl : (fileUrl.startsWith('/') ? '$baseUrl$fileUrl' : fileUrl),
+          });
+        }
+      } catch (e) {
+        print('⚠️ teacher_homework fetch: $e');
+      }
+
       // 2. Fetch student's submissions
       final subResults = await conn.execute(
         'SELECT homework_id, student_email, student_name, submitted_at, file_name, file_path, student_comment, grade, teacher_feedback FROM app_homework_submissions WHERE student_email = :email;',
@@ -1638,10 +1682,8 @@ class AppState extends ChangeNotifier {
       }
 
       // Update active homework list if any homework was fetched
-      if (dbHomework.isNotEmpty) {
-        _homeworkList = dbHomework;
-        _saveHomework();
-      }
+      _homeworkList = dbHomework;
+      _saveHomework();
 
       // 4. Fetch notes from app_notes
       final notesResults = await conn.execute(
@@ -1666,10 +1708,8 @@ class AppState extends ChangeNotifier {
         });
       }
 
-      if (dbNotes.isNotEmpty) {
-        _notesList = dbNotes;
-        _saveNotes();
-      }
+      _notesList = dbNotes;
+      _saveNotes();
 
       notifyListeners();
       print('✅ TiDB Homework and Notes sync complete! Total Homework: ${_homeworkList.length}, Total Notes: ${_notesList.length}');
@@ -1700,11 +1740,9 @@ class AppState extends ChangeNotifier {
       } else {
         dbMessages = await DbHelper.getTeacherMessages(_studentName);
       }
-      if (dbMessages.isNotEmpty) {
-        _teacherMessages = dbMessages;
-        _saveTeacherMessages();
-        notifyListeners();
-      }
+      _teacherMessages = dbMessages;
+      _saveTeacherMessages();
+      notifyListeners();
       print('✅ TiDB teacher messages sync complete! Total: ${_teacherMessages.length}');
     } catch (e) {
       print('⚠️ Failed to sync teacher messages: $e');
@@ -1736,11 +1774,9 @@ class AppState extends ChangeNotifier {
     print('🔄 Synchronizing live classes from TiDB Cloud database...');
     try {
       final dbLive = await DbHelper.getLiveClasses(tId);
-      if (dbLive.isNotEmpty) {
-        _liveClassesSchedule = dbLive;
-        _saveLiveClassesSchedule();
-        notifyListeners();
-      }
+      _liveClassesSchedule = dbLive;
+      _saveLiveClassesSchedule();
+      notifyListeners();
       print('✅ TiDB live classes sync complete! Total: ${_liveClassesSchedule.length}');
     } catch (e) {
       print('⚠️ Failed to sync live classes: $e');
@@ -2361,11 +2397,9 @@ class AppState extends ChangeNotifier {
     print('🔄 Synchronizing recorded lectures from TiDB Cloud database...');
     try {
       final dbLectures = await DbHelper.getRecordedLectures();
-      if (dbLectures.isNotEmpty) {
-        _recordedLectures = dbLectures;
-        _saveRecordedLectures();
-        notifyListeners();
-      }
+      _recordedLectures = dbLectures;
+      _saveRecordedLectures();
+      notifyListeners();
       print('✅ TiDB recorded lectures sync complete! Total: ${_recordedLectures.length}');
     } catch (e) {
       print('⚠️ Failed to sync recorded lectures: $e');
@@ -2376,10 +2410,8 @@ class AppState extends ChangeNotifier {
     print('🔄 Synchronizing leaderboard from TiDB Cloud database...');
     try {
       final dbLeaderboard = await DbHelper.getLeaderboardData();
-      if (dbLeaderboard.isNotEmpty) {
-        _leaderboard = dbLeaderboard;
-        notifyListeners();
-      }
+      _leaderboard = dbLeaderboard;
+      notifyListeners();
       print('✅ TiDB leaderboard sync complete! Total: ${_leaderboard.length}');
     } catch (e) {
       print('⚠️ Failed to sync leaderboard: $e');
@@ -3076,6 +3108,30 @@ class AppState extends ChangeNotifier {
     _syncTimer?.cancel();
     _syncTimer = null;
     print('🛑 Periodic database sync timer stopped.');
+  }
+
+  /// Called when app resumes from background — re-verify session and sync data
+  Future<void> refreshDataOnResume() async {
+    if (!_isLoggedIn) return;
+    try {
+      // Verify token is still valid
+      final api = ApiService();
+      final result = await api.getMe();
+      if (result != null && result['success'] == true) {
+        _sessionVerified = true;
+        // Trigger a full data sync
+        await syncAllData();
+      } else {
+        // Token expired — force logout
+        _isLoggedIn = false;
+        _sessionVerified = false;
+        _prefs.setBool('is_logged_in', false);
+        await api.clearTokens();
+        notifyListeners();
+      }
+    } catch (e) {
+      print('⚠️ refreshDataOnResume error: $e');
+    }
   }
 
   Future<void> syncAllData() async {
