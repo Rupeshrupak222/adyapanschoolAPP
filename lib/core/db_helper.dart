@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
-import 'package:mysql_client/mysql_client.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,7 +9,6 @@ import 'package:dbcrypt/dbcrypt.dart';
 import 'package:argon2/argon2.dart';
 
 class DbHelper {
-  static MySQLConnection? _conn;
   static final Random _random = Random.secure();
 
   static String _newId(String prefix) {
@@ -19,262 +17,16 @@ class DbHelper {
     return '${prefix}_${timestamp}_$suffix';
   }
 
-  // Establish a new connection or return the existing live connection
-  static Future<MySQLConnection> getConnection() async {
-    if (_conn != null && _conn!.connected) {
-      try {
-        // Test connection with a fast dummy query to check if it's still alive
-        await _conn!.execute('SELECT 1;');
-        return _conn!;
-      } catch (_) {
-        // Connection closed or timed out, recreate it
-        _conn = null;
-      }
-    }
-
-    final host = dotenv.env['MYSQL_HOST'] ?? '';
-    final portStr = dotenv.env['MYSQL_PORT'] ?? '4000';
-    final port = int.tryParse(portStr) ?? 4000;
-    final user = dotenv.env['MYSQL_USER'] ?? '';
-    final password = dotenv.env['MYSQL_PASSWORD'] ?? '';
-    final db = dotenv.env['MYSQL_DATABASE'] ?? 'preschool';
-    final sslEnabled = dotenv.env['MYSQL_SSL'] == 'true';
-
-    final conn = await MySQLConnection.createConnection(
-      host: host,
-      port: port,
-      userName: user,
-      password: password,
-      databaseName: db,
-      secure: sslEnabled, // Enable SSL/TLS encryption for TiDB Serverless
+  // Direct MySQL connection is DISABLED for Play Store compliance.
+  // All data access goes through the backend REST API (ApiService).
+  // This prevents database credentials from being embedded in the APK.
+  static Future<dynamic> getConnection() async {
+    throw UnsupportedError(
+      'Direct DB access disabled. Use ApiService/ApiBridge instead.'
     );
-
-    await conn.connect();
-    _conn = conn;
-    
-    // Ensure standard database tables are created automatically
-    await _initDatabase();
-
-    return _conn!;
   }
 
-  // Create table if it does not exist
-  static Future<void> _initDatabase() async {
-    if (_conn == null) return;
-    try {
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-          id VARCHAR(64) PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          email VARCHAR(255) NOT NULL UNIQUE,
-          phone VARCHAR(50) NOT NULL,
-          class_name VARCHAR(100) NOT NULL,
-          school VARCHAR(255) NOT NULL,
-          password VARCHAR(255) NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-      ''');
-
-      // Alter table users to add missing columns for backward/forward compatibility
-      try { await _conn!.execute('ALTER TABLE users ADD COLUMN class_level VARCHAR(100);'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE users ADD COLUMN school_name VARCHAR(255);'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE users ADD COLUMN password_hash VARCHAR(255);'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT "student";'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE users ADD COLUMN otp_verified TINYINT DEFAULT 1;'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE users ADD COLUMN signup_source VARCHAR(50) DEFAULT "flutter";'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE users ADD COLUMN teacher_id VARCHAR(64);'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE users ADD COLUMN xp INT DEFAULT 120;'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE users ADD COLUMN level INT DEFAULT 1;'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE users ADD COLUMN streak INT DEFAULT 3;'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE users ADD COLUMN completed_quizzes INT DEFAULT 4;'); } catch (_) {}
-
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS login_events (
-          id VARCHAR(64) PRIMARY KEY,
-          user_id VARCHAR(64) NOT NULL,
-          name VARCHAR(160),
-          email VARCHAR(190) NOT NULL,
-          role VARCHAR(30),
-          source VARCHAR(40) NOT NULL DEFAULT 'unknown',
-          status VARCHAR(40) NOT NULL DEFAULT 'success',
-          ip_address VARCHAR(80),
-          user_agent TEXT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX idx_login_events_user_id (user_id),
-          INDEX idx_login_events_email (email),
-          INDEX idx_login_events_source (source),
-          INDEX idx_login_events_created_at (created_at)
-        );
-      ''');
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS attendance (
-          id VARCHAR(64) PRIMARY KEY,
-          user_id VARCHAR(64) NOT NULL,
-          subject VARCHAR(100) NOT NULL,
-          status VARCHAR(30) NOT NULL,
-          time VARCHAR(50) NOT NULL,
-          source VARCHAR(50) NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX idx_attendance_user_id (user_id)
-        );
-      ''');
-
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS app_homework (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          title VARCHAR(255) NOT NULL,
-          subject VARCHAR(100) NOT NULL,
-          description TEXT,
-          due_date VARCHAR(100) NOT NULL,
-          priority VARCHAR(50) NOT NULL,
-          added_by VARCHAR(160) NOT NULL,
-          teacher_id VARCHAR(64) NOT NULL,
-          class_level VARCHAR(100) DEFAULT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-      ''');
-
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS app_homework_submissions (
-          id VARCHAR(64) PRIMARY KEY,
-          homework_id INT NOT NULL,
-          student_email VARCHAR(190) NOT NULL,
-          student_name VARCHAR(160) NOT NULL,
-          submitted_at VARCHAR(100) NOT NULL,
-          file_name VARCHAR(255),
-          file_path TEXT,
-          student_comment TEXT,
-          grade VARCHAR(50) DEFAULT 'Pending Grade',
-          teacher_feedback TEXT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX idx_submissions_homework (homework_id),
-          INDEX idx_submissions_student (student_email)
-        );
-      ''');
-
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS app_notes (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          title VARCHAR(255) NOT NULL,
-          subject VARCHAR(100) NOT NULL,
-          description TEXT,
-          file_name VARCHAR(255) NOT NULL,
-          file_size VARCHAR(50) NOT NULL,
-          pages INT NOT NULL,
-          uploaded_by VARCHAR(160) NOT NULL,
-          uploaded_at VARCHAR(100) NOT NULL,
-          file_path TEXT,
-          teacher_id VARCHAR(64) NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-      ''');
-
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS app_doubts (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          student_name VARCHAR(160) NOT NULL,
-          student_email VARCHAR(190) NOT NULL,
-          student_class VARCHAR(80) NOT NULL,
-          subject VARCHAR(100) NOT NULL,
-          question TEXT NOT NULL,
-          replied TINYINT DEFAULT 0,
-          reply_text TEXT,
-          time VARCHAR(100) NOT NULL,
-          attachment_type VARCHAR(50),
-          attachment_name VARCHAR(255),
-          attachment_path TEXT,
-          teacher_id VARCHAR(64) NOT NULL,
-          reply_attachment_type VARCHAR(50) DEFAULT 'None',
-          reply_attachment_name VARCHAR(255) DEFAULT '',
-          reply_attachment_path TEXT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX idx_doubts_student (student_email),
-          INDEX idx_doubts_teacher (teacher_id)
-        );
-      ''');
-
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS app_live_classes (
-          id VARCHAR(64) PRIMARY KEY,
-          subject VARCHAR(100) NOT NULL,
-          topic VARCHAR(255) NOT NULL,
-          time VARCHAR(100) NOT NULL,
-          status VARCHAR(50) NOT NULL,
-          is_live TINYINT NOT NULL DEFAULT 0,
-          teacher_id VARCHAR(64) NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX idx_live_classes_teacher (teacher_id)
-        );
-      ''');
-
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS app_notices (
-          id VARCHAR(64) PRIMARY KEY,
-          title VARCHAR(255) NOT NULL,
-          body TEXT NOT NULL,
-          time VARCHAR(100) NOT NULL,
-          teacher_id VARCHAR(64) NOT NULL,
-          teacher_name VARCHAR(160) NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX idx_notices_teacher (teacher_id)
-        );
-      ''');
-
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS app_skills_syllabus (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          class_name VARCHAR(80) NOT NULL,
-          title VARCHAR(255) NOT NULL,
-          syllabus_json TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE KEY idx_class_title (class_name, title)
-        );
-      ''');
-
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS app_custom_games (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          game_type VARCHAR(50) NOT NULL,
-          class_level VARCHAR(80) NOT NULL,
-          data_json TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-      ''');
-
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS app_teacher_messages (
-          id VARCHAR(64) PRIMARY KEY,
-          student_name VARCHAR(160) NOT NULL,
-          teacher_name VARCHAR(160) NOT NULL,
-          message TEXT NOT NULL,
-          category VARCHAR(50) NOT NULL,
-          is_read TINYINT DEFAULT 0,
-          date_str VARCHAR(100) NOT NULL,
-          meeting_response TEXT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-      ''');
-
-      await _conn!.execute('''
-        CREATE TABLE IF NOT EXISTS app_recorded_lectures (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          title VARCHAR(255) NOT NULL,
-          duration VARCHAR(100) NOT NULL,
-          teacher VARCHAR(160) NOT NULL,
-          emoji VARCHAR(50) NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-      ''');
-      try { await _conn!.execute('ALTER TABLE app_recorded_lectures ADD COLUMN video_url TEXT;'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE app_homework ADD COLUMN file_name VARCHAR(255);'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE app_homework ADD COLUMN file_path TEXT;'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE app_homework ADD COLUMN file_url TEXT;'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE app_homework_submissions MODIFY COLUMN file_path LONGTEXT;'); } catch (_) {}
-      try { await _conn!.execute('ALTER TABLE homework_submissions MODIFY COLUMN file_url LONGTEXT;'); } catch (_) {}
-    } catch (e) {
-      print('❌ Database table initialization failed: $e');
-    }
-  }
+  // _initDatabase removed — schema is managed by the backend server
 
   // Call REST API for authentication (uses the deployed backend)
   static Future<Map<String, dynamic>?> callAuthApi({
