@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Unified API Service — connects mobile app to the shared backend
 /// All authentication flows through this service to ensure password hashing
@@ -17,6 +18,11 @@ class ApiService {
   String? _token;
   String? _refreshToken;
 
+  // Secure storage for tokens (encrypted on device, safe from root access)
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -24,26 +30,42 @@ class ApiService {
         if (_token != null) 'Authorization': 'Bearer $_token',
       };
 
-  /// Initialize — load saved token from SharedPreferences
+  /// Initialize — load saved token from secure storage
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('auth_token');
-    _refreshToken = prefs.getString('refresh_token');
+    _token = await _secureStorage.read(key: 'auth_token');
+    _refreshToken = await _secureStorage.read(key: 'refresh_token');
+
+    // Migration: move tokens from SharedPreferences to secure storage
+    if (_token == null) {
+      final prefs = await SharedPreferences.getInstance();
+      final oldToken = prefs.getString('auth_token');
+      final oldRefresh = prefs.getString('refresh_token');
+      if (oldToken != null) {
+        _token = oldToken;
+        _refreshToken = oldRefresh;
+        await _secureStorage.write(key: 'auth_token', value: oldToken);
+        if (oldRefresh != null) await _secureStorage.write(key: 'refresh_token', value: oldRefresh);
+        await prefs.remove('auth_token');
+        await prefs.remove('refresh_token');
+      }
+    }
   }
 
-  /// Save tokens after login
+  /// Save tokens after login (encrypted storage)
   Future<void> _saveTokens(String token, String refreshToken) async {
     _token = token;
     _refreshToken = refreshToken;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', token);
-    await prefs.setString('refresh_token', refreshToken);
+    await _secureStorage.write(key: 'auth_token', value: token);
+    await _secureStorage.write(key: 'refresh_token', value: refreshToken);
   }
 
   /// Clear tokens on logout
   Future<void> clearTokens() async {
     _token = null;
     _refreshToken = null;
+    await _secureStorage.delete(key: 'auth_token');
+    await _secureStorage.delete(key: 'refresh_token');
+    // Also clean up any legacy SharedPreferences tokens
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('refresh_token');
@@ -602,10 +624,9 @@ class ApiService {
         final responseData = data['data'] ?? data;
         _token = responseData['token'] ?? responseData['accessToken'];
         _refreshToken = responseData['refreshToken'] ?? _refreshToken;
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', _token!);
+        await _secureStorage.write(key: 'auth_token', value: _token!);
         if (_refreshToken != null) {
-          await prefs.setString('refresh_token', _refreshToken!);
+          await _secureStorage.write(key: 'refresh_token', value: _refreshToken!);
         }
         return true;
       }

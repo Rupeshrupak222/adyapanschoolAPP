@@ -154,8 +154,8 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> _customQuizQuestions = [];
   List<Map<String, dynamic>> get customQuizQuestions => _customQuizQuestions;
 
-  Map<String, String> _userCredentials = {};
-  Map<String, String> get userCredentials => _userCredentials;
+  // Credentials are NOT cached locally for security
+  Map<String, String> get userCredentials => {};
 
   List<Map<String, dynamic>> _customCognitiveLevels = [];
   List<Map<String, dynamic>> get customCognitiveLevels => _customCognitiveLevels;
@@ -332,13 +332,7 @@ class AppState extends ChangeNotifier {
     if (customQsJson != null) {
       _customQuizQuestions = List<Map<String, dynamic>>.from(jsonDecode(customQsJson));
     }
-    final credsJson = _prefs.getString('user_credentials');
-    if (credsJson != null) {
-      _userCredentials = Map<String, String>.from(jsonDecode(credsJson));
-    } else {
-      _userCredentials = {};
-      _saveCredentials();
-    }
+    // Credentials no longer cached locally for security
 
     // Load Attendance Logs
     final attendanceJson = _prefs.getString('attendance_logs');
@@ -677,9 +671,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Session & Auth Registry helpers
+  // Credentials are no longer cached — security improvement
   void _saveCredentials() {
-    _prefs.setString('user_credentials', jsonEncode(_userCredentials));
+    // No-op: credentials are not stored locally
   }
 
   void logout() {
